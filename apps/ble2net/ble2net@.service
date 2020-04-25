@@ -3,7 +3,7 @@ Description=HCI network server
 
 [Service]
 Type=simple
-ExecStart=ble2net --device hci0
+ExecStart=ble2net --device hci%I --listen :300%I
 Restart=always
 RestartSec=3
 StartLimitIntervalSec=0
