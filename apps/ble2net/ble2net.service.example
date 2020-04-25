@@ -1,0 +1,13 @@
+[Unit]
+Description=HCI network server
+
+[Service]
+Type=simple
+ExecStart=ble2net --device hci0
+Restart=always
+RestartSec=3
+StartLimitIntervalSec=0
+
+[Install]
+WantedBy=multi-user.target
+
