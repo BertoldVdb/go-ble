@@ -10,9 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	hcidrivers "github.com/BertoldVdb/go-ble/drivers"
-	hciinterface "github.com/BertoldVdb/go-ble/drivers/interface"
-	serialhci "github.com/BertoldVdb/go-ble/drivers/serial"
+	hcidrivers "github.com/BertoldVdb/go-ble/hci/drivers"
+	hciinterface "github.com/BertoldVdb/go-ble/hci/drivers/interface"
+	hcidriverserial "github.com/BertoldVdb/go-ble/hci/drivers/serial"
 )
 
 type config struct {
@@ -21,6 +21,8 @@ type config struct {
 
 	connectCommand    *string
 	disconnectCommand *string
+
+	resetEvent *bool
 }
 
 func runShell(cmd string) error {
@@ -43,10 +45,17 @@ func clientHandler(parentWg *sync.WaitGroup, currentConn net.Conn, config *confi
 	runShell(*config.connectCommand)
 	defer runShell(*config.disconnectCommand)
 
-	clientDev, err := serialhci.OpenPort(currentConn)
+	clientDev, err := hcidriverserial.OpenPort(currentConn)
 	if err != nil {
 		log.Println("  Failed to make H4 protocol interface:", err)
 		return
+	}
+
+	if *config.resetEvent {
+		resetPkt := []byte{0x04, 0x0E, 0x03, 0x01, 0x00, 0x00}
+		if clientDev.SendPacket(hciinterface.HCITxPacket{Data: resetPkt}) != nil {
+			return
+		}
 	}
 
 	hwDev, err := hcidrivers.Open(*config.deviceName)
@@ -88,7 +97,7 @@ func clientHandler(parentWg *sync.WaitGroup, currentConn net.Conn, config *confi
 
 		err := clientDev.Run()
 		if err != nil {
-			log.Println("  Client interface closed:", err)
+			log.Println("  Client interface stopped:", err)
 		}
 	}()
 	go func() {
@@ -97,7 +106,7 @@ func clientHandler(parentWg *sync.WaitGroup, currentConn net.Conn, config *confi
 
 		err := hwDev.Run()
 		if err != nil {
-			log.Println("  Hardware interface closed:", err)
+			log.Println("  Hardware interface stopped:", err)
 		}
 	}()
 
@@ -111,11 +120,12 @@ func main() {
 	config.deviceName = flag.String("device", "", "The device to use. If not specified, a list of all devices is printed")
 	config.connectCommand = flag.String("connect", "", "Command to execute upon connection")
 	config.disconnectCommand = flag.String("disconnect", "", "Command to execute upon disconnection")
+	config.resetEvent = flag.Bool("reset", false, "Send reset complete event on connect")
 
 	flag.Parse()
 
 	if *config.deviceName == "" {
-		fmt.Println("No device specified (--device).")
+		fmt.Println("No device specified (-device).")
 		fmt.Println("Listing all known devices:")
 		devices, err := hcidrivers.ListDevices()
 		if err != nil || len(devices) == 0 {
