@@ -1,14 +1,16 @@
 package hcicmdmgr
 
 import (
-	"log"
 	"sync"
+
+	"github.com/sirupsen/logrus"
 )
 
 type CommandCompleteCallback func(err error, params []byte) error
 type TransmitCallback func(pkt []byte) error
 
 type CommandManager struct {
+	logger *logrus.Entry
 	sync.Mutex
 
 	closed bool
@@ -21,9 +23,9 @@ type CommandManager struct {
 	transmitFunc TransmitCallback
 }
 
-func New(maxSlots []int, awaitStartup bool, tx TransmitCallback) *CommandManager {
+func New(logger *logrus.Entry, maxSlots []int, awaitStartup bool, tx TransmitCallback) *CommandManager {
 	s := &CommandManager{
-
+		logger:       logger,
 		transmitFunc: tx,
 	}
 
@@ -35,7 +37,7 @@ func New(maxSlots []int, awaitStartup bool, tx TransmitCallback) *CommandManager
 
 	s.queues = make([]commandQueue, len(maxSlots))
 	for i := range s.queues {
-		s.queues[i].Init(s, maxSlots[i])
+		s.queues[i].Init(s, maxSlots[i], i)
 	}
 
 	return s
@@ -47,10 +49,11 @@ func (s *CommandManager) Run() error {
 
 	wg.Add(len(s.queues))
 
+	s.logger.Debug("Starting command queue workers")
+
 	for i := range s.queues {
 		go func(worker int) {
 			err2 := s.queues[worker].Worker()
-			log.Println("Worker quit", err2)
 			if err2 != nil {
 				err = err2
 			}
@@ -64,9 +67,7 @@ func (s *CommandManager) Run() error {
 }
 
 func (s *CommandManager) Close() {
-	log.Println("Closing parent")
 	s.Lock()
-	log.Println("Closing parent have lock")
 
 	if s.closed {
 		s.Unlock()
@@ -75,12 +76,9 @@ func (s *CommandManager) Close() {
 	s.closed = true
 	s.Unlock()
 
-	log.Println("Closing parent released lock")
-
 	close(s.commandMaxIssueChanged)
+
 	for i := range s.queues {
 		s.queues[i].closeQueue()
 	}
-
-	log.Println("Closing parent done")
 }

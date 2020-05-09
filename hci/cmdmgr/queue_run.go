@@ -2,7 +2,6 @@ package hcicmdmgr
 
 import (
 	"context"
-	"log"
 	"time"
 
 	hciconst "github.com/BertoldVdb/go-ble/hci/const"
@@ -34,7 +33,6 @@ func (s *commandQueue) commandRunPutToken(token *commandToken) ([]byte, error) {
 	token.timeoutTime = time.Now().Add(time.Second)
 	token.data[3] = byte(len(token.data) - 4)
 
-	log.Println(token.data)
 	err := s.commandQueue.CommitToken(token)
 	if err != nil {
 		return nil, err
@@ -46,10 +44,12 @@ func (s *commandQueue) commandRunPutToken(token *commandToken) ([]byte, error) {
 		if !ok {
 			return nil, ErrorWorkerClosed
 		}
-		log.Println(token.data)
 
 		if cberr != nil {
-			cberr = s.commandRunReleaseToken(token)
+			err = s.commandRunReleaseToken(token)
+			if err != nil {
+				return nil, err
+			}
 			return nil, cberr
 		}
 
@@ -72,6 +72,7 @@ func (s *commandQueue) commandRun(cmd HCICommand, output []byte, sync bool, cb C
 	if err != nil {
 		return nil, err
 	}
+
 	buf, err := s.commandRunPutToken(token)
 	if err != nil {
 		return nil, err

@@ -8,18 +8,8 @@ type HCICommand struct {
 
 type QueueIndex int
 
-func (s *CommandManager) CommandRunSync(queue QueueIndex, cmd HCICommand, output []byte) ([]byte, error) {
-	return s.queues[queue].commandRun(cmd, output, true, nil)
-}
-
-func (s *CommandManager) CommandRunAsync(queue QueueIndex, cmd HCICommand, cb CommandCompleteCallback) error {
-	_, err := s.queues[queue].commandRun(cmd, nil, false, cb)
-	return err
-}
-
-func (s *CommandManager) CommandRun(queue QueueIndex, cmd HCICommand) error {
-	_, err := s.queues[queue].commandRun(cmd, nil, false, nil)
-	return err
+func (s *CommandManager) CommandRun(queue QueueIndex, cmd HCICommand, output []byte, cb CommandCompleteCallback) ([]byte, error) {
+	return s.queues[queue].commandRun(cmd, output, cb == nil, cb)
 }
 
 type HCICommandBuffer struct {
@@ -30,11 +20,15 @@ type HCICommandBuffer struct {
 
 func (s *CommandManager) CommandRunGetBuffer(queue QueueIndex, cmd HCICommand, cb CommandCompleteCallback) (HCICommandBuffer, error) {
 	token, err := s.queues[queue].commandRunGetToken(cmd, cb == nil, cb)
+	if err != nil {
+		return HCICommandBuffer{}, err
+	}
+
 	return HCICommandBuffer{
 		token:  token,
 		queue:  queue,
 		Buffer: token.data,
-	}, err
+	}, nil
 }
 
 func (s *CommandManager) CommandRunPutBuffer(buffer HCICommandBuffer) ([]byte, error) {

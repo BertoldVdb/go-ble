@@ -1,0 +1,832 @@
+
+c|7|1|Inquiry Complete|0x01
+ |4|Status|1|
+ |5|TERM
+
+c|7|2|Inquiry Result|0x02
+ |4|Num_Responses|1|
+ |4|BD_ADDR[i]|6|Num_Responses
+ |4|Page_Scan_Repetition_Mode[i]|1|Num_Responses
+ |4|Reserved[i]|2|Num_Responses
+ |4|Class_Of_Device[i]|3|Num_Responses
+ |4|Clock_Offset[i]|2|Num_Responses
+ |5|TERM
+
+c|7|3|Connection Complete|0x03
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|BD_ADDR|6|
+ |4|Link_Type|1|
+ |4|Encryption_Enabled|1|
+ |5|TERM
+
+c|7|4|Connection Request|0x04
+ |4|BD_ADDR|6|
+ |4|Class_Of_Device|3|
+ |4|Link_Type|1|
+ |5|TERM
+
+c|7|5|Disconnection Complete|0x05
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|Reason|1|
+ |5|TERM
+
+c|7|6|Authentication Complete|0x06
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |5|TERM
+
+c|7|7|Remote Name Request Complete|0x07
+ |4|Status|1|
+ |4|BD_ADDR|6|
+ |4|Remote_Name|248|
+ |5|TERM
+
+c|7|8|Encryption Change|0x08
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|Encryption_Enabled|1|
+ |5|TERM
+
+c|7|9|Change Connection Link Key Complete|0x09
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |5|TERM
+
+c|7|10|Master Link Key Complete|0x0A
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|Key_Flag|1|
+ |5|TERM
+
+c|7|11|Read Remote Supported Features Complete|0x0B
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|LMP_Features|8|
+ |5|TERM
+
+c|7|12|Read Remote Version Information Complete|0x0C
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|Version|1|
+ |4|Manufacturer_Name|2|
+ |4|Subversion|2|
+ |5|TERM
+
+c|7|13|QoS Setup Complete|0x0D
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|Unused|1|
+ |4|Service_Type|1|
+ |4|Token_Rate|4|
+ |4|Peak_Bandwidth|4|
+ |4|Latency|4|
+ |4|Delay_Variation|4|
+ |5|TERM
+
+c|7|14|Command Complete|0x0E
+ |4|Num_HCI_Command_Packets|1|
+ |4|Command_Opcode|2|
+ |4|Return_Parameters|0|
+ |5|TERM
+
+c|7|15|Command Status|0x0F
+ |4|Status|1|
+ |4|Num_HCI_Command_Packets|1|
+ |4|Command_Opcode|2|
+ |5|TERM
+
+c|7|16|Hardware Error|0x10
+ |4|Hardware_Code|1|
+ |5|TERM
+
+c|7|17|Flush Occurred|0x11
+ |4|Handle|2|
+ |5|TERM
+
+c|7|18|Role Change|0x12
+ |4|Status|1|
+ |4|BD_ADDR|6|
+ |4|New_Role|1|
+ |5|TERM
+
+c|7|19|Number Of Completed Packets|0x13
+ |4|Num_Handles|1|
+ |4|Connection_Handle[i]|2|Num_Handles
+ |4|Num_Completed_Packets[i]|2|Num_Handles
+ |5|TERM
+
+c|7|20|Mode Change|0x14
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|Current_Mode|1|
+ |4|Interval|2|
+ |5|TERM
+
+c|7|21|Return Link Keys|0x15
+ |4|Num_Keys|1|
+ |4|BD_ADDR[i]|6|Num_Keys
+ |4|Link_Key[i]|16|Num_Keys
+ |5|TERM
+
+c|7|22|PIN Code Request|0x16
+ |4|BD_ADDR|6|
+ |5|TERM
+
+c|7|23|Link Key Request|0x17
+ |4|BD_ADDR|6|
+ |5|TERM
+
+c|7|24|Link Key Notification|0x18
+ |4|BD_ADDR|6|
+ |4|Link_Key|16|
+ |4|Key_Type|1|
+ |5|TERM
+
+c|7|25|Loopback Command|0x19
+ |4|HCI_Command_Packet|0|
+ |5|TERM
+
+c|7|26|Data Buffer Overflow|0x1A
+ |4|Link_Type|1|
+ |5|TERM
+
+c|7|27|Max Slots Change|0x1B
+ |4|Connection_Handle|2|
+ |4|LMP_Max_Slots|1|
+ |5|TERM
+
+c|7|28|Read Clock Offset Complete|0x1C
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|Clock_Offset|2|
+ |5|TERM
+
+c|7|29|Connection Packet Type Changed|0x1D
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|Packet_Type|2|
+ |5|TERM
+
+c|7|30|QoS Violation|0x1E
+ |4|Handle|2|
+ |5|TERM
+
+c|7|31|Page Scan Repetition Mode Change|0x20
+ |4|BD_ADDR|6|
+ |4|Page_Scan_Repetition_Mode|1|
+ |5|TERM
+
+c|7|32|Flow Specification Complete|0x21
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|Unused|1|
+ |4|Flow_Direction|1|
+ |4|Service_Type|1|
+ |4|Token_Rate|4|
+ |4|Token_Bucket_Size|4|
+ |4|Peak_Bandwidth|4|
+ |4|Access_Latency|4|
+ |5|TERM
+
+c|7|33|Inquiry Result with RSSI|0x22
+ |4|Num_Responses|1|
+ |4|BD_ADDR[i]|6|Num_Responses
+ |4|Page_Scan_Repetition_Mode[i]|1|Num_Responses
+ |4|Reserved[i]|1|Num_Responses
+ |4|Class_Of_Device[i]|3|Num_Responses
+ |4|Clock_Offset[i]|2|Num_Responses
+ |4|RSSI[i]|1|Num_Responses
+ |5|TERM
+
+c|7|34|Read Remote Extended Features Complete|0x23
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|Page_Number|1|
+ |4|Maximum_Page_Number|1|
+ |4|Extended_LMP_Features|8|
+ |5|TERM
+
+c|7|35|Synchronous Connection Complete|0x2C
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|BD_ADDR|6|
+ |4|Link_Type|1|
+ |4|Transmission_Interval|1|
+ |4|Retransmission_Window|1|
+ |4|RX_Packet_Length|2|
+ |4|TX_Packet_Length|2|
+ |4|Air_Mode|1|
+ |5|TERM
+
+c|7|36|Synchronous Connection Changed|0x2D
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|Transmission_Interval|1|
+ |4|Retransmission_Window|1|
+ |4|RX_Packet_Length|2|
+ |4|TX_Packet_Length|2|
+ |5|TERM
+
+c|7|37|Sniff Subrating|0x2E
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|Max_TX_Latency|2|
+ |4|Max_RX_Latency|2|
+ |4|Min_Remote_Timeout|2|
+ |4|Min_Local_Timeout|2|
+ |5|TERM
+
+c|7|38|Extended Inquiry Result|0x2F
+ |4|Num_Responses|1|
+ |4|BD_ADDR|6|
+ |4|Page_Scan_Repetition_Mode|1|
+ |4|Reserved|1|
+ |4|Class_Of_Device|3|
+ |4|Clock_Offset|2|
+ |4|RSSI|1|
+ |4|Extended_Inquiry_Response|240|
+ |5|TERM
+
+c|7|39|Encryption Key Refresh Complete|0x30
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |5|TERM
+
+c|7|40|IO Capability Request|0x31
+ |4|BD_ADDR|6|
+ |5|TERM
+
+c|7|41|IO Capability Response|0x32
+ |4|BD_ADDR|6|
+ |4|IO_Capability|1|
+ |4|OOB_Data_Present|1|
+ |4|Authentication_Requirements|1|
+ |5|TERM
+
+c|7|42|User Confirmation Request|0x33
+ |4|BD_ADDR|6|
+ |4|Numeric_Value|4|
+ |5|TERM
+
+c|7|43|User Passkey Request|0x34
+ |4|BD_ADDR|6|
+ |5|TERM
+
+c|7|44|Remote OOB Data Request|0x35
+ |4|BD_ADDR|6|
+ |5|TERM
+
+c|7|45|Simple Pairing Complete|0x36
+ |4|Status|1|
+ |4|BD_ADDR|6|
+ |5|TERM
+
+c|7|46|Link Supervision Timeout Changed|0x38
+ |4|Connection_Handle|2|
+ |4|Link_Supervision_Timeout|2|
+ |5|TERM
+
+c|7|47|Enhanced Flush Complete|0x39
+ |4|Handle|2|
+ |5|TERM
+
+c|7|48|User Passkey Notification|0x3B
+ |4|BD_ADDR|6|
+ |4|Passkey|4|
+ |5|TERM
+
+c|7|49|Keypress Notification|0x3C
+ |4|BD_ADDR|6|
+ |4|Notification_Type|1|
+ |5|TERM
+
+c|7|50|Remote Host Supported Features Notification|0x3D
+ |4|BD_ADDR|6|
+ |4|Host_Supported_Features|8|
+ |5|TERM
+
+c|7|51|Physical Link Complete|0x40
+ |4|Status|1|
+ |4|Physical_Link_Handle|1|
+ |5|TERM
+
+c|7|52|Channel Selected|0x41
+ |4|Physical_Link_Handle|1|
+ |5|TERM
+
+c|7|53|Disconnection Physical Link Complete|0x42
+ |4|Status|1|
+ |4|Physical_Link_Handle|1|
+ |4|Reason|1|
+ |5|TERM
+
+c|7|54|Physical Link Loss Early Warning|0x43
+ |4|Physical_Link_Handle|1|
+ |4|Link_Loss_Reason|1|
+ |5|TERM
+
+c|7|55|Physical Link Recovery|0x44
+ |4|Physical_Link_Handle|1|
+ |5|TERM
+
+c|7|56|Logical Link Complete|0x45
+ |4|Status|1|
+ |4|Logical_Link_Handle|2|
+ |4|Physical_Link_Handle|1|
+ |4|TX_Flow_Spec_ID|1|
+ |5|TERM
+
+c|7|57|Disconnection Logical Link Complete|0x46
+ |4|Status|1|
+ |4|Logical_Link_Handle|2|
+ |4|Reason|1|
+ |5|TERM
+
+c|7|58|Flow Spec Modify Complete|0x47
+ |4|Status|1|
+ |4|Handle|2|
+ |5|TERM
+
+c|7|59|Number Of Completed Data Blocks|0x48
+ |4|Total_Num_Data_Blocks|2|
+ |4|Num_Handles|1|
+ |4|Handle[i]|2|Num_Handles
+ |4|Num_Completed_Packets[i]|2|Num_Handles
+ |4|Num_Completed_Blocks[i]|2|Num_Handles
+ |5|TERM
+
+c|7|60|Short Range Mode Change Complete|0x4C
+ |4|Status|1|
+ |4|Physical_Link_Handle|1|
+ |4|Short_Range_Mode_State|1|
+ |5|TERM
+
+c|7|61|AMP Status Change|0x4D
+ |4|Status|1|
+ |4|AMP_Status|1|
+ |5|TERM
+
+c|7|62|AMP Start Test|0x49
+ |4|Status|1|
+ |4|Test_Scenario|1|
+ |5|TERM
+
+c|7|63|AMP Test End|0x4A
+ |4|Status|1|
+ |4|Test_Scenario|1|
+ |5|TERM
+
+c|7|64|AMP Receiver Report|0x4B
+ |4|Controller_Type|1|
+ |4|Reason|1|
+ |5|TERM
+
+c|7|65.1|LE Connection Complete|0x3E
+ |4|Subevent_Code|1|
+ |s|0x01
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|Role|1|
+ |4|Peer_Address_Type|1|
+ |4|Peer_Address|6|
+ |4|Connection_Interval|2|
+ |4|Connection_Latency|2|
+ |4|Supervision_Timeout|2|
+ |4|Master_Clock_Accuracy|1|
+ |5|TERM
+
+c|7|65.2|LE Advertising Report|0x3E
+ |4|Subevent_Code|1|
+ |s|0x02
+ |4|Num_Reports|1|
+ |4|Event_Type[i]|1|Num_Reports
+ |4|Address_Type[i]|1|Num_Reports
+ |4|Address[i]|6|Num_Reports
+ |4|Data_Length[i]|1|Num_Reports
+ |4|Data[i]|0|Num_Reports
+ |4|RSSI[i]|1|Num_Reports
+ |5|TERM
+
+c|7|65.3|LE Connection Update Complete|0x3E
+ |4|Subevent_Code|1|
+ |s|0x03
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|Connection_Interval|2|
+ |4|Connection_Latency|2|
+ |4|Supervision_Timeout|2|
+ |5|TERM
+
+c|7|65.4|LE Read Remote Features Complete|0x3E
+ |4|Subevent_Code|1|
+ |s|0x04
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|LE_Features|8|
+ |5|TERM
+
+c|7|65.5|LE Long Term Key Request|0x3E
+ |4|Subevent_Code|1|
+ |s|0x05
+ |4|Connection_Handle|2|
+ |4|Random_Number|8|
+ |4|Encrypted_Diversifier|2|
+ |5|TERM
+
+c|7|65.6|LE Remote Connection Parameter Request|0x3E
+ |4|Subevent_Code|1|
+ |s|0x06
+ |4|Connection_Handle|2|
+ |4|Interval_Min|2|
+ |4|Interval_Max|2|
+ |4|Latency|2|
+ |4|Timeout|2|
+ |5|TERM
+
+c|7|65.7|LE Data Length Change|0x3E
+ |4|Subevent_Code|1|
+ |s|0x07
+ |4|Connection_Handle|2|
+ |4|Max_TX_Octets|2|
+ |4|Max_TX_Time|2|
+ |4|Max_RX_Octets|2|
+ |4|Max_RX_Time|2|
+ |5|TERM
+
+c|7|65.8|LE Read Local P-256 Public Key Complete|0x3E
+ |4|Subevent_Code|1|
+ |s|0x08
+ |4|Status|1|
+ |4|Local_P-256_Public_Key|64|
+ |5|TERM
+
+c|7|65.9|LE Generate DHKey Complete|0x3E
+ |4|Subevent_Code|1|
+ |s|0x09
+ |4|Status|1|
+ |4|DH_Key|32|
+ |5|TERM
+
+c|7|65.10|LE Enhanced Connection Complete|0x3E
+ |4|Subevent_Code|1|
+ |s|0x0A
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|Role|1|
+ |4|Peer_Address_Type|1|
+ |4|Peer_Address|6|
+ |4|Local_Resolvable_Private_Address|6|
+ |4|Peer_Resolvable_Private_Address|6|
+ |4|Connection_Interval|2|
+ |4|Connection_Latency|2|
+ |4|Supervision_Timeout|2|
+ |4|Master_Clock_Accuracy|1|
+ |5|TERM
+
+c|7|65.11|LE Directed Advertising Report|0x3E
+ |4|Subevent_Code|1|
+ |s|0x0B
+ |4|Num_Reports|1|
+ |4|Event_Type[i]|1|Num_Reports
+ |4|Address_Type[i]|1|Num_Reports
+ |4|Address[i]|6|Num_Reports
+ |4|Direct_Address_Type[i]|1|Num_Reports
+ |4|Direct_Address[i]|6|Num_Reports
+ |4|RSSI[i]|1|Num_Reports
+ |5|TERM
+
+c|7|65.12|LE PHY Update Complete|0x3E
+ |4|Subevent_Code|1|
+ |s|0x0C
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|TX_PHY|1|
+ |4|RX_PHY|1|
+ |5|TERM
+
+c|7|65.13|LE Extended Advertising Report|0x3E
+ |4|Subevent_Code|1|
+ |s|0x0D
+ |4|Num_Reports|1|
+ |4|Event_Type[i]|2|Num_Reports
+ |4|Address_Type[i]|1|Num_Reports
+ |4|Address[i]|6|Num_Reports
+ |4|Primary_PHY[i]|1|Num_Reports
+ |4|Secondary_PHY[i]|1|Num_Reports
+ |4|Advertising_SID[i]|1|Num_Reports
+ |4|TX_Power[i]|1|Num_Reports
+ |4|RSSI[i]|1|Num_Reports
+ |4|Periodic_Advertising_Interval[i]|2|Num_Reports
+ |4|Direct_Address_Type[i]|1|Num_Reports
+ |4|Direct_Address[i]|6|Num_Reports
+ |4|Data_Length[i]|1|Num_Reports
+ |4|Data[i]|0|Num_Reports
+ |5|TERM
+
+c|7|65.14|LE Periodic Advertising Sync Established|0x3E
+ |4|Subevent_Code|1|
+ |s|0x0E
+ |4|Status|1|
+ |4|Sync_Handle|2|
+ |4|Advertising_SID|1|
+ |4|Advertiser_Address_Type|1|
+ |4|Advertiser_Address|6|
+ |4|Advertiser_PHY|1|
+ |4|Periodic_Advertising_Interval|2|
+ |4|Advertiser_Clock_Accuracy|1|
+ |5|TERM
+
+c|7|65.15|LE Periodic Advertising Report|0x3E
+ |4|Subevent_Code|1|
+ |s|0x0F
+ |4|Sync_Handle|2|
+ |4|TX_Power|1|
+ |4|RSSI|1|
+ |4|CTE_Type|1|
+ |4|Data_Status|1|
+ |4|Data_Length|1|
+ |4|Data|Data_Length|
+ |5|TERM
+
+c|7|65.16|LE Periodic Advertising Sync Lost|0x3E
+ |4|Subevent_Code|1|
+ |s|0x10
+ |4|Sync_Handle|2|
+ |5|TERM
+
+c|7|65.17|LE Scan Timeout|0x3E
+ |4|Subevent_Code|1|
+ |s|0x11
+ |5|TERM
+
+c|7|65.18|LE Advertising Set Terminated|0x3E
+ |4|Subevent_Code|1|
+ |s|0x12
+ |4|Status|1|
+ |4|Advertising_Handle|1|
+ |4|Connection_Handle|2|
+ |4|Num_Completed_Extended_Advertising_Events|1|
+ |5|TERM
+
+c|7|65.19|LE Scan Request Received|0x3E
+ |4|Subevent_Code|1|
+ |s|0x13
+ |4|Advertising_Handle|1|
+ |4|Scanner_Address_Type|1|
+ |4|Scanner_Address|6|
+ |5|TERM
+
+c|7|65.20|LE Channel Selection Algorithm|0x3E
+ |4|Subevent_Code|1|
+ |s|0x14
+ |4|Connection_Handle|2|
+ |4|Channel_Selection_Algorithm|1|
+ |5|TERM
+
+c|7|65.21|LE Connectionless IQ Report|0x3E
+ |4|Subevent_Code|1|
+ |s|0x15
+ |4|Sync_Handle|2|
+ |4|Channel_Index|1|
+ |4|RSSI|2|
+ |4|RSSI_Antenna_ID|1|
+ |4|CTE_Type|1|
+ |4|Slot_Durations|1|
+ |4|Packet_Status|1|
+ |4|Periodic_Event_Counter|2|
+ |4|Sample_Count|1|
+ |4|I_Sample[i]|1|Sample_Count
+ |4|Q_Sample[i]|1|Sample Count
+ |5|TERM
+
+c|7|65.22|LE Connection IQ Report|0x3E
+ |4|Subevent_Code|1|
+ |s|0x16
+ |4|Connection_Handle|2|
+ |4|RX_PHY|1|
+ |4|Data_Channel_Index|1|
+ |4|RSSI|2|
+ |4|RSSI_Antenna_ID|1|
+ |4|CTE_Type|1|
+ |4|Slot_Durations|1|
+ |4|Packet_Status|1|
+ |4|Connection_Event_Counter|2|
+ |4|Sample_Count|1|
+ |4|I_Sample[i]|1|Sample_Count
+ |4|Q_Sample[i]|1|Sample_Count
+ |5|TERM
+
+c|7|65.23|LE CTE Request Failed|0x3E
+ |4|Subevent_Code|1|
+ |s|0x17
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |5|TERM
+
+c|7|65.24|LE Periodic Advertising Sync Transfer Received|0x3E
+ |4|Subevent_Code|1|
+ |s|0x18
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|Service_Data|2|
+ |4|Sync_Handle|2|
+ |4|Advertising_SID|1|
+ |4|Advertiser_Address_Type|1|
+ |4|Advertiser_Address|6|
+ |4|Advertiser_PHY|1|
+ |4|Periodic_Advertising_Interval|2|
+ |4|Advertiser_Clock_Accuracy|1|
+ |5|TERM
+
+c|7|65.25|LE CIS Established|0x3E
+ |4|Subevent_Code|1|
+ |s|0x19
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|PHY_M_To_S|1|
+ |4|PHY_S_To_M|1|
+ |4|NSE|1|
+ |4|BN_M_To_S|1|
+ |4|BN_S_To_M|1|
+ |4|FT_M_To_S|1|
+ |4|FT_S_To_M|1|
+ |4|Max_PDU_M_To_S|2|
+ |4|Max_PDU_S_To_M|2|
+ |4|ISO_interval|2|
+ |5|TERM
+
+c|7|65.26|LE CIS Request|0x3E
+ |4|Subevent_Code|1|
+ |s|0x1A
+ |4|ACL_Connection_Handle|2|
+ |4|CIS_Connecton_Handle|2|
+ |4|CIG_ID|1|
+ |4|CIS_ID|1|
+ |5|TERM
+
+c|7|65.27|LE Create BIG Complete|0x3E
+ |4|Subevent_Code|1|
+ |s|0x1B
+ |4|Status|1|
+ |4|BIG_Handle|1|
+ |4|BIG_Sync_Delay|3|
+ |4|Transport_Latency_BIG|3|
+ |4|PHY|1|
+ |4|NSE|1|
+ |4|BN|1|
+ |4|PTO|1|
+ |4|IRC|1|
+ |4|Max_PDU|2|
+ |4|ISO_Interval|2|
+ |4|Num_BIS|1|
+ |4|Connection_Handle[i]|2|Num_BIS
+ |5|TERM
+
+c|7|65.28|LE Terminate BIG Complete|0x3E
+ |4|Subevent_Code|1|
+ |s|0x1C
+ |4|BIG_Handle|1|
+ |4|Reason|1|
+ |5|TERM
+
+c|7|65.29|LE BIG Sync Established|0x3E
+ |4|Subevent_Code|1|
+ |s|0x1D
+ |4|Status|1|
+ |4|BIG_Handle|1|
+ |4|Transport_Latency_BIG|3|
+ |4|NSE|1|
+ |4|BN|1|
+ |4|PTO|1|
+ |4|IRC|1|
+ |4|Max_PDU|2|
+ |4|ISO_Interval|2|
+ |4|Num_BIS|1|
+ |4|Connection_Handle[i]|2|Num_BIS
+ |5|TERM
+
+c|7|65.30|LE BIG Sync Lost|0x3E
+ |4|Subevent_Code|1|
+ |s|0x1E
+ |4|BIG_Handle|1|
+ |4|Reason|1|
+ |5|TERM
+
+c|7|65.31|LE Request Peer SCA Complete|0x3E
+ |4|Subevent_Code|1|
+ |s|0x1F
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|Peer_Clock_Accuracy|1|
+ |5|TERM
+
+c|7|65.32|LE Path Loss Threshold|0x3E
+ |4|Subevent_Code|1|
+ |s|0x20
+ |4|Connection_Handle|2|
+ |4|Current_Path_Loss|1|
+ |4|Zone_Entered|1|
+ |5|TERM
+
+c|7|65.33|LE Transmit Power Reporting|0x3E
+ |4|Subevent_Code|1|
+ |s|0x21
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |4|Reason|1|
+ |4|PHY|1|
+ |4|Transmit_Power_Level|1|
+ |4|Transmit_Power_Level_Flag|1|
+ |4|Delta|1|
+ |5|TERM
+
+c|7|65.34|LE BIGInfo Advertising Report|0x3E
+ |4|Subevent_Code|1|
+ |s|0x22
+ |4|Sync_Handle|2|
+ |4|Num_BIS|1|
+ |4|NSE|1|
+ |4|ISO_Interval|2|
+ |4|BN|1|
+ |4|PTO|1|
+ |4|IRC|1|
+ |4|Max_PDU|2|
+ |4|SDU_Interval|3|
+ |4|Max_SDU|2|
+ |4|PHY|1|
+ |4|Framing|1|
+ |4|Encryption|1|
+ |5|TERM
+
+c|7|66|Triggered Clock Capture|0x4E
+ |4|Connection_Handle|2|
+ |4|Which_Clock|1|
+ |4|Clock|4|
+ |4|Slot_Offset|2|
+ |5|TERM
+
+c|7|67|Synchronization Train Complete|0x4F
+ |4|Status|1|
+ |5|TERM
+
+c|7|68|Synchronization Train Received|0x50
+ |4|Status|1|
+ |4|BD_ADDR|6|
+ |4|Clock_Offset|4|
+ |4|AFH_Channel_Map|10|
+ |4|LT_ADDR|1|
+ |4|Next_Broadcast_Instant|4|
+ |4|Connectionless_Slave_Broadcast_Interval|2|
+ |4|Service_Data|1|
+ |5|TERM
+
+c|7|69|Connectionless Slave Broadcast Receive|0x51
+ |4|BD_ADDR|6|
+ |4|LT_ADDR|1|
+ |4|CLK|4|
+ |4|Offset|4|
+ |4|RX_Status|1|
+ |4|Fragment|1|
+ |4|Data_Length|1|
+ |4|Data|Data_Length|
+ |5|TERM
+
+c|7|70|Connectionless Slave Broadcast Timeout|0x52
+ |4|BD_ADDR|6|
+ |4|LT_ADDR|1|
+ |5|TERM
+
+c|7|71|Truncated Page Complete|0x53
+ |4|Status|1|
+ |4|BD_ADDR|6|
+ |5|TERM
+
+c|7|72|Slave Page Response Timeout|0x54
+ |5|TERM
+
+c|7|73|Connectionless Slave Broadcast Channel Map Change|0x55
+ |4|Channel_Map|10|
+ |5|TERM
+
+c|7|74|Inquiry Response Notification|0x56
+ |4|LAP|3|
+ |4|RSSI|1|
+ |5|TERM
+
+c|7|75|Authenticated Payload Timeout Expired|0x57
+ |4|Connection_Handle|2|
+ |5|TERM
+
+c|7|76|SAM Status Change|0x58
+ |4|Connection_Handle|2|
+ |4|Local_SAM_Index|1|
+ |4|Local_SAM_TX_Availability|1|
+ |4|Local_SAM_RX_Availability|1|
+ |4|Remote_SAM_Index|1|
+ |4|Remote_SAM_TX_Availability|1|
+ |4|Remote_SAM_RX_Availability|1|
+ |4|LE_Event_Mask|8|
+ |4|Status|1|
+ |5|HCI_Command_Complete

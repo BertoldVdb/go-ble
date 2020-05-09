@@ -7,10 +7,12 @@ import (
 	"time"
 
 	"github.com/BertoldVdb/go-misc/tokenqueue"
+	"github.com/sirupsen/logrus"
 )
 
 type commandQueue struct {
-	parent *CommandManager
+	parent   *CommandManager
+	workerID int
 
 	commandQueue  *tokenqueue.Queue
 	commandActive []*commandToken
@@ -42,7 +44,8 @@ func (c *commandToken) Cleanup() {
 	close(c.completed)
 }
 
-func (s *commandQueue) Init(parent *CommandManager, numSlots int) {
+func (s *commandQueue) Init(parent *CommandManager, numSlots int, id int) {
+	s.workerID = id
 	s.parent = parent
 	s.commandQueue = tokenqueue.NewQueue(numSlots, numSlots, func() tokenqueue.Token {
 		return &commandToken{
@@ -103,8 +106,12 @@ func (s *commandQueue) closeQueue() {
 	s.commandQueue.Close()
 }
 
-func (s *commandQueue) waitCondition(condition chan (struct{}), timeout <-chan (time.Time)) error {
+func (s *commandQueue) waitCondition(condition chan (struct{}), timeout <-chan (time.Time), reason string) error {
 	s.parent.Unlock()
+
+	if s.parent.logger != nil && s.parent.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		s.parent.logger.WithField("0worker", s.workerID).Trace(reason)
+	}
 
 	stuckCnt := 0
 	for {
@@ -119,6 +126,7 @@ func (s *commandQueue) waitCondition(condition chan (struct{}), timeout <-chan (
 		case <-timeout:
 			stuckCnt++
 			if stuckCnt >= 2 {
+				s.parent.logger.WithField("0worker", s.workerID).Error("Timeout: " + reason)
 				return ErrorTimeout
 			}
 		}
@@ -150,6 +158,7 @@ func (s *commandQueue) Worker() error {
 					if now.After(m.timeoutTime) {
 						s.parent.Unlock()
 
+						s.parent.logger.WithField("0worker", s.workerID).Error("Hardware timeout")
 						return ErrorTimeout
 					}
 				}
@@ -164,7 +173,7 @@ func (s *commandQueue) Worker() error {
 			/* Can we send more commands? */
 			s.parent.Lock()
 			for s.parent.commandMaxIssue == 0 {
-				err := s.waitCondition(s.parent.commandMaxIssueChanged, stuckTimer.C)
+				err := s.waitCondition(s.parent.commandMaxIssueChanged, stuckTimer.C, "Queue blocked due slot exhaustion")
 				if err != nil {
 					return err
 				}
@@ -175,13 +184,16 @@ func (s *commandQueue) Worker() error {
 			   issued commands with the same opcode. Here we wait to ensure that there are no
 			   tokens with the same opcode */
 			for s.findToken(workingToken.opcode, false) != nil {
-				err := s.waitCondition(s.tokenRemoved, stuckTimer.C)
+				err := s.waitCondition(s.tokenRemoved, stuckTimer.C, "Queue blocked due opcode collision")
 				if err != nil {
 					return err
 				}
 			}
 
 			txData := workingToken.data
+
+			debugMaxIssue := s.parent.commandMaxIssue
+			debugOpcode := workingToken.opcode
 
 			/* It is guaranteed there will be at least one nil element */
 			for i := range s.commandActive {
@@ -202,6 +214,14 @@ func (s *commandQueue) Worker() error {
 				}
 			}
 			s.parent.Unlock()
+
+			if s.parent.logger != nil && s.parent.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+				s.parent.logger.WithFields(logrus.Fields{
+					"0worker": s.workerID,
+					"1slots":  debugMaxIssue,
+					"2opcode": debugOpcode,
+				}).Trace("Issueing command")
+			}
 
 			err := s.parent.transmitFunc(txData)
 			if err != nil {

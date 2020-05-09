@@ -3,6 +3,8 @@ package hcicommands
 import (
 	"encoding/binary"
 	hcicmdmgr "github.com/BertoldVdb/go-ble/hci/cmdmgr"
+	bleutil "github.com/BertoldVdb/go-ble/util"
+	"github.com/sirupsen/logrus"
 )
 
 // LESetEventMaskInput represents the input of the command specified in Section 7.8.1
@@ -11,34 +13,47 @@ type LESetEventMaskInput struct {
 }
 
 func (i LESetEventMaskInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint64(w.Put(8), i.LEEventMask)
-	return w.Data()
+	return w.Data
 }
 
 // LESetEventMaskSync executes the command specified in Section 7.8.1 synchronously
 func (c *Commands) LESetEventMaskSync (params LESetEventMaskInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetEventMask started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0001}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetEventMask completed")
+	}
 
+	 return err
+}
 // LEReadBufferSizeOutput represents the output of the command specified in Section 7.8.2
 type LEReadBufferSizeOutput struct {
 	Status uint8
@@ -47,27 +62,33 @@ type LEReadBufferSizeOutput struct {
 }
 
 func (o *LEReadBufferSizeOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.LEACLDataPacketLength = binary.LittleEndian.Uint16(r.Get(2))
-	o.TotalNumLEACLDataPackets = r.GetOne()
+	o.TotalNumLEACLDataPackets = uint8(r.GetOne())
 	return r.Valid()
 }
 
 // LEReadBufferSizeSync executes the command specified in Section 7.8.2 synchronously
 func (c *Commands) LEReadBufferSizeSync (result *LEReadBufferSizeOutput) (*LEReadBufferSizeOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LEReadBufferSize started")
+	}
 	if result == nil {
 		result = &LEReadBufferSizeOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0002}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -76,14 +97,20 @@ func (c *Commands) LEReadBufferSizeSync (result *LEReadBufferSizeOutput) (*LERea
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "1result": result,
+		}).Debug("LEReadBufferSize completed")
+	}
 
+	 return result, err
+}
 // LEReadBufferSizeV2Output represents the output of the command specified in Section 7.8.2
 type LEReadBufferSizeV2Output struct {
 	Status uint8
@@ -94,29 +121,35 @@ type LEReadBufferSizeV2Output struct {
 }
 
 func (o *LEReadBufferSizeV2Output) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.LEACLDataPacketLength = binary.LittleEndian.Uint16(r.Get(2))
-	o.TotalNumLEACLDataPackets = r.GetOne()
+	o.TotalNumLEACLDataPackets = uint8(r.GetOne())
 	o.ISODataPacketLength = binary.LittleEndian.Uint16(r.Get(2))
-	o.TotalNumISODataPackets = r.GetOne()
+	o.TotalNumISODataPackets = uint8(r.GetOne())
 	return r.Valid()
 }
 
 // LEReadBufferSizeV2Sync executes the command specified in Section 7.8.2 synchronously
 func (c *Commands) LEReadBufferSizeV2Sync (result *LEReadBufferSizeV2Output) (*LEReadBufferSizeV2Output, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LEReadBufferSizeV2 started")
+	}
 	if result == nil {
 		result = &LEReadBufferSizeV2Output{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0060}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -125,14 +158,20 @@ func (c *Commands) LEReadBufferSizeV2Sync (result *LEReadBufferSizeV2Output) (*L
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "1result": result,
+		}).Debug("LEReadBufferSizeV2 completed")
+	}
 
+	 return result, err
+}
 // LEReadLocalSupportedFeaturesOutput represents the output of the command specified in Section 7.8.3
 type LEReadLocalSupportedFeaturesOutput struct {
 	Status uint8
@@ -140,26 +179,32 @@ type LEReadLocalSupportedFeaturesOutput struct {
 }
 
 func (o *LEReadLocalSupportedFeaturesOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.LEFeatures = binary.LittleEndian.Uint64(r.Get(8))
 	return r.Valid()
 }
 
 // LEReadLocalSupportedFeaturesSync executes the command specified in Section 7.8.3 synchronously
 func (c *Commands) LEReadLocalSupportedFeaturesSync (result *LEReadLocalSupportedFeaturesOutput) (*LEReadLocalSupportedFeaturesOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LEReadLocalSupportedFeatures started")
+	}
 	if result == nil {
 		result = &LEReadLocalSupportedFeaturesOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0003}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -168,96 +213,128 @@ func (c *Commands) LEReadLocalSupportedFeaturesSync (result *LEReadLocalSupporte
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "1result": result,
+		}).Debug("LEReadLocalSupportedFeatures completed")
+	}
 
+	 return result, err
+}
 // LESetRandomAddressInput represents the input of the command specified in Section 7.8.4
 type LESetRandomAddressInput struct {
-	RandomAddess [6]byte
+	RandomAddess bleutil.MacAddr
 }
 
 func (i LESetRandomAddressInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	copy(w.Put(6), i.RandomAddess[:])
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	i.RandomAddess.Encode(w.Put(6))
+	return w.Data
 }
 
 // LESetRandomAddressSync executes the command specified in Section 7.8.4 synchronously
 func (c *Commands) LESetRandomAddressSync (params LESetRandomAddressInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetRandomAddress started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0005}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetRandomAddress completed")
+	}
 
+	 return err
+}
 // LESetAdvertisingParametersInput represents the input of the command specified in Section 7.8.5
 type LESetAdvertisingParametersInput struct {
 	AdvertisingIntervalMin uint16
 	AdvertisingIntervalMax uint16
 	AdvertisingType uint8
-	OwnAddressType uint8
-	PeerAddressType uint8
-	PeerAddress [6]byte
+	OwnAddressType bleutil.MacAddrType
+	PeerAddressType bleutil.MacAddrType
+	PeerAddress bleutil.MacAddr
 	AdvertisingChannelMap uint8
 	AdvertisingFilterPolicy uint8
 }
 
 func (i LESetAdvertisingParametersInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.AdvertisingIntervalMin)
 	binary.LittleEndian.PutUint16(w.Put(2), i.AdvertisingIntervalMax)
-	w.PutOne(i.AdvertisingType)
-	w.PutOne(i.OwnAddressType)
-	w.PutOne(i.PeerAddressType)
-	copy(w.Put(6), i.PeerAddress[:])
-	w.PutOne(i.AdvertisingChannelMap)
-	w.PutOne(i.AdvertisingFilterPolicy)
-	return w.Data()
+	w.PutOne(uint8(i.AdvertisingType))
+	w.PutOne(uint8(i.OwnAddressType))
+	w.PutOne(uint8(i.PeerAddressType))
+	i.PeerAddress.Encode(w.Put(6))
+	w.PutOne(uint8(i.AdvertisingChannelMap))
+	w.PutOne(uint8(i.AdvertisingFilterPolicy))
+	return w.Data
 }
 
 // LESetAdvertisingParametersSync executes the command specified in Section 7.8.5 synchronously
 func (c *Commands) LESetAdvertisingParametersSync (params LESetAdvertisingParametersInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetAdvertisingParameters started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0006}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetAdvertisingParameters completed")
+	}
 
+	 return err
+}
 // LEReadAdvertisingPhysicalChannelTxPowerOutput represents the output of the command specified in Section 7.8.6
 type LEReadAdvertisingPhysicalChannelTxPowerOutput struct {
 	Status uint8
@@ -265,26 +342,32 @@ type LEReadAdvertisingPhysicalChannelTxPowerOutput struct {
 }
 
 func (o *LEReadAdvertisingPhysicalChannelTxPowerOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
-	o.TXPowerLevel = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
+	o.TXPowerLevel = uint8(r.GetOne())
 	return r.Valid()
 }
 
 // LEReadAdvertisingPhysicalChannelTxPowerSync executes the command specified in Section 7.8.6 synchronously
 func (c *Commands) LEReadAdvertisingPhysicalChannelTxPowerSync (result *LEReadAdvertisingPhysicalChannelTxPowerOutput) (*LEReadAdvertisingPhysicalChannelTxPowerOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LEReadAdvertisingPhysicalChannelTxPower started")
+	}
 	if result == nil {
 		result = &LEReadAdvertisingPhysicalChannelTxPowerOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0007}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -293,14 +376,20 @@ func (c *Commands) LEReadAdvertisingPhysicalChannelTxPowerSync (result *LEReadAd
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "1result": result,
+		}).Debug("LEReadAdvertisingPhysicalChannelTxPower completed")
+	}
 
+	 return result, err
+}
 // LESetAdvertisingDataInput represents the input of the command specified in Section 7.8.7
 type LESetAdvertisingDataInput struct {
 	AdvertisingDataLength uint8
@@ -308,35 +397,48 @@ type LESetAdvertisingDataInput struct {
 }
 
 func (i LESetAdvertisingDataInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.AdvertisingDataLength)
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.AdvertisingDataLength))
 	copy(w.Put(31), i.AdvertisingData[:])
-	return w.Data()
+	return w.Data
 }
 
 // LESetAdvertisingDataSync executes the command specified in Section 7.8.7 synchronously
 func (c *Commands) LESetAdvertisingDataSync (params LESetAdvertisingDataInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetAdvertisingData started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0008}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetAdvertisingData completed")
+	}
 
+	 return err
+}
 // LESetScanResponseDataInput represents the input of the command specified in Section 7.8.8
 type LESetScanResponseDataInput struct {
 	ScanResponseDataLength uint8
@@ -344,111 +446,150 @@ type LESetScanResponseDataInput struct {
 }
 
 func (i LESetScanResponseDataInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.ScanResponseDataLength)
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.ScanResponseDataLength))
 	copy(w.Put(31), i.ScanResponseData[:])
-	return w.Data()
+	return w.Data
 }
 
 // LESetScanResponseDataSync executes the command specified in Section 7.8.8 synchronously
 func (c *Commands) LESetScanResponseDataSync (params LESetScanResponseDataInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetScanResponseData started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0009}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetScanResponseData completed")
+	}
 
+	 return err
+}
 // LESetAdvertisingEnableInput represents the input of the command specified in Section 7.8.9
 type LESetAdvertisingEnableInput struct {
 	AdvertisingEnable uint8
 }
 
 func (i LESetAdvertisingEnableInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.AdvertisingEnable)
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.AdvertisingEnable))
+	return w.Data
 }
 
 // LESetAdvertisingEnableSync executes the command specified in Section 7.8.9 synchronously
 func (c *Commands) LESetAdvertisingEnableSync (params LESetAdvertisingEnableInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetAdvertisingEnable started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x000A}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetAdvertisingEnable completed")
+	}
 
+	 return err
+}
 // LESetScanParametersInput represents the input of the command specified in Section 7.8.10
 type LESetScanParametersInput struct {
 	LEScanType uint8
 	LEScanInterval uint16
 	LEScanWindow uint16
-	OwnAddressType uint8
+	OwnAddressType bleutil.MacAddrType
 	ScanningFilterPolicy uint8
 }
 
 func (i LESetScanParametersInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.LEScanType)
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.LEScanType))
 	binary.LittleEndian.PutUint16(w.Put(2), i.LEScanInterval)
 	binary.LittleEndian.PutUint16(w.Put(2), i.LEScanWindow)
-	w.PutOne(i.OwnAddressType)
-	w.PutOne(i.ScanningFilterPolicy)
-	return w.Data()
+	w.PutOne(uint8(i.OwnAddressType))
+	w.PutOne(uint8(i.ScanningFilterPolicy))
+	return w.Data
 }
 
 // LESetScanParametersSync executes the command specified in Section 7.8.10 synchronously
 func (c *Commands) LESetScanParametersSync (params LESetScanParametersInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetScanParameters started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x000B}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetScanParameters completed")
+	}
 
+	 return err
+}
 // LESetScanEnableInput represents the input of the command specified in Section 7.8.11
 type LESetScanEnableInput struct {
 	LEScanEnable uint8
@@ -456,43 +597,56 @@ type LESetScanEnableInput struct {
 }
 
 func (i LESetScanEnableInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.LEScanEnable)
-	w.PutOne(i.FilterDuplicates)
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.LEScanEnable))
+	w.PutOne(uint8(i.FilterDuplicates))
+	return w.Data
 }
 
 // LESetScanEnableSync executes the command specified in Section 7.8.11 synchronously
 func (c *Commands) LESetScanEnableSync (params LESetScanEnableInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetScanEnable started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x000C}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetScanEnable completed")
+	}
 
+	 return err
+}
 // LECreateConnectionInput represents the input of the command specified in Section 7.8.12
 type LECreateConnectionInput struct {
 	LEScanInterval uint16
 	LEScanWindow uint16
 	InitiatorFilterPolicy uint8
-	PeerAddressType uint8
-	PeerAddress [6]byte
-	OwnAddressType uint8
+	PeerAddressType bleutil.MacAddrType
+	PeerAddress bleutil.MacAddr
+	OwnAddressType bleutil.MacAddrType
 	ConnectionIntervalMin uint16
 	ConnectionIntervalMax uint16
 	ConnectionLatency uint16
@@ -502,67 +656,91 @@ type LECreateConnectionInput struct {
 }
 
 func (i LECreateConnectionInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.LEScanInterval)
 	binary.LittleEndian.PutUint16(w.Put(2), i.LEScanWindow)
-	w.PutOne(i.InitiatorFilterPolicy)
-	w.PutOne(i.PeerAddressType)
-	copy(w.Put(6), i.PeerAddress[:])
-	w.PutOne(i.OwnAddressType)
+	w.PutOne(uint8(i.InitiatorFilterPolicy))
+	w.PutOne(uint8(i.PeerAddressType))
+	i.PeerAddress.Encode(w.Put(6))
+	w.PutOne(uint8(i.OwnAddressType))
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionIntervalMin)
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionIntervalMax)
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionLatency)
 	binary.LittleEndian.PutUint16(w.Put(2), i.SupervisionTimeout)
 	binary.LittleEndian.PutUint16(w.Put(2), i.MinCELength)
 	binary.LittleEndian.PutUint16(w.Put(2), i.MaxCELength)
-	return w.Data()
+	return w.Data
 }
 
 // LECreateConnectionSync executes the command specified in Section 7.8.12 synchronously
 func (c *Commands) LECreateConnectionSync (params LECreateConnectionInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LECreateConnection started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x000D}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LECreateConnection completed")
+	}
 
+	 return err
+}
 // LECreateConnectionCancelSync executes the command specified in Section 7.8.13 synchronously
 func (c *Commands) LECreateConnectionCancelSync () error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LECreateConnectionCancel started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x000E}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+		}).Debug("LECreateConnectionCancel completed")
+	}
 
+	 return err
+}
 // LEReadWhiteListSizeOutput represents the output of the command specified in Section 7.8.14
 type LEReadWhiteListSizeOutput struct {
 	Status uint8
@@ -570,26 +748,32 @@ type LEReadWhiteListSizeOutput struct {
 }
 
 func (o *LEReadWhiteListSizeOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
-	o.WhiteListSize = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
+	o.WhiteListSize = uint8(r.GetOne())
 	return r.Valid()
 }
 
 // LEReadWhiteListSizeSync executes the command specified in Section 7.8.14 synchronously
 func (c *Commands) LEReadWhiteListSizeSync (result *LEReadWhiteListSizeOutput) (*LEReadWhiteListSizeOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LEReadWhiteListSize started")
+	}
 	if result == nil {
 		result = &LEReadWhiteListSizeOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x000F}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -598,108 +782,151 @@ func (c *Commands) LEReadWhiteListSizeSync (result *LEReadWhiteListSizeOutput) (
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
-
-// LEClearWhiteListSync executes the command specified in Section 7.8.15 synchronously
-func (c *Commands) LEClearWhiteListSync () error {
-	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0010}, nil)
-	if err != nil {
-		return err
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "1result": result,
+		}).Debug("LEReadWhiteListSize completed")
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	 return result, err
+}
+// LEClearWhiteListSync executes the command specified in Section 7.8.15 synchronously
+func (c *Commands) LEClearWhiteListSync () error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LEClearWhiteList started")
+	}
+	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0010}, nil)
 	if err != nil {
-		return err
+		goto log
+	}
+
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	if err != nil {
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+		}).Debug("LEClearWhiteList completed")
+	}
 
+	 return err
+}
 // LEAddDeviceToWhiteListInput represents the input of the command specified in Section 7.8.16
 type LEAddDeviceToWhiteListInput struct {
-	AddressType uint8
-	Address [6]byte
+	AddressType bleutil.MacAddrType
+	Address bleutil.MacAddr
 }
 
 func (i LEAddDeviceToWhiteListInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.AddressType)
-	copy(w.Put(6), i.Address[:])
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.AddressType))
+	i.Address.Encode(w.Put(6))
+	return w.Data
 }
 
 // LEAddDeviceToWhiteListSync executes the command specified in Section 7.8.16 synchronously
 func (c *Commands) LEAddDeviceToWhiteListSync (params LEAddDeviceToWhiteListInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEAddDeviceToWhiteList started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0011}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LEAddDeviceToWhiteList completed")
+	}
 
+	 return err
+}
 // LERemoveDeviceFromWhiteListInput represents the input of the command specified in Section 7.8.17
 type LERemoveDeviceFromWhiteListInput struct {
-	AddressType uint8
-	Address [6]byte
+	AddressType bleutil.MacAddrType
+	Address bleutil.MacAddr
 }
 
 func (i LERemoveDeviceFromWhiteListInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.AddressType)
-	copy(w.Put(6), i.Address[:])
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.AddressType))
+	i.Address.Encode(w.Put(6))
+	return w.Data
 }
 
 // LERemoveDeviceFromWhiteListSync executes the command specified in Section 7.8.17 synchronously
 func (c *Commands) LERemoveDeviceFromWhiteListSync (params LERemoveDeviceFromWhiteListInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LERemoveDeviceFromWhiteList started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0012}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LERemoveDeviceFromWhiteList completed")
+	}
 
+	 return err
+}
 // LEConnectionUpdateInput represents the input of the command specified in Section 7.8.18
 type LEConnectionUpdateInput struct {
 	ConnectionHandle uint16
@@ -712,7 +939,7 @@ type LEConnectionUpdateInput struct {
 }
 
 func (i LEConnectionUpdateInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionIntervalMin)
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionIntervalMax)
@@ -720,75 +947,101 @@ func (i LEConnectionUpdateInput) encode(data []byte) []byte {
 	binary.LittleEndian.PutUint16(w.Put(2), i.SupervisionTimeout)
 	binary.LittleEndian.PutUint16(w.Put(2), i.MinCELength)
 	binary.LittleEndian.PutUint16(w.Put(2), i.MaxCELength)
-	return w.Data()
+	return w.Data
 }
 
 // LEConnectionUpdateSync executes the command specified in Section 7.8.18 synchronously
 func (c *Commands) LEConnectionUpdateSync (params LEConnectionUpdateInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEConnectionUpdate started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0013}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LEConnectionUpdate completed")
+	}
 
+	 return err
+}
 // LESetHostChannelClassificationInput represents the input of the command specified in Section 7.8.19
 type LESetHostChannelClassificationInput struct {
 	ChannelMap [5]byte
 }
 
 func (i LESetHostChannelClassificationInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	copy(w.Put(5), i.ChannelMap[:])
-	return w.Data()
+	return w.Data
 }
 
 // LESetHostChannelClassificationSync executes the command specified in Section 7.8.19 synchronously
 func (c *Commands) LESetHostChannelClassificationSync (params LESetHostChannelClassificationInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetHostChannelClassification started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0014}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetHostChannelClassification completed")
+	}
 
+	 return err
+}
 // LEReadChannelMapInput represents the input of the command specified in Section 7.8.20
 type LEReadChannelMapInput struct {
 	ConnectionHandle uint16
 }
 
 func (i LEReadChannelMapInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	return w.Data()
+	return w.Data
 }
 
 // LEReadChannelMapOutput represents the output of the command specified in Section 7.8.20
@@ -799,8 +1052,8 @@ type LEReadChannelMapOutput struct {
 }
 
 func (o *LEReadChannelMapOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	copy(o.ChannelMap[:], r.Get(5))
 	return r.Valid()
@@ -808,19 +1061,26 @@ func (o *LEReadChannelMapOutput) decode(data []byte) bool {
 
 // LEReadChannelMapSync executes the command specified in Section 7.8.20 synchronously
 func (c *Commands) LEReadChannelMapSync (params LEReadChannelMapInput, result *LEReadChannelMapOutput) (*LEReadChannelMapOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEReadChannelMap started")
+	}
 	if result == nil {
 		result = &LEReadChannelMapOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0015}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -829,48 +1089,68 @@ func (c *Commands) LEReadChannelMapSync (params LEReadChannelMapInput, result *L
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LEReadChannelMap completed")
+	}
 
+	 return result, err
+}
 // LEReadRemoteFeaturesInput represents the input of the command specified in Section 7.8.21
 type LEReadRemoteFeaturesInput struct {
 	ConnectionHandle uint16
 }
 
 func (i LEReadRemoteFeaturesInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	return w.Data()
+	return w.Data
 }
 
 // LEReadRemoteFeaturesSync executes the command specified in Section 7.8.21 synchronously
 func (c *Commands) LEReadRemoteFeaturesSync (params LEReadRemoteFeaturesInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEReadRemoteFeatures started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0016}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LEReadRemoteFeatures completed")
+	}
 
+	 return err
+}
 // LEEncryptInput represents the input of the command specified in Section 7.8.22
 type LEEncryptInput struct {
 	Key [16]byte
@@ -878,10 +1158,10 @@ type LEEncryptInput struct {
 }
 
 func (i LEEncryptInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	copy(w.Put(16), i.Key[:])
 	copy(w.Put(16), i.PlaintextData[:])
-	return w.Data()
+	return w.Data
 }
 
 // LEEncryptOutput represents the output of the command specified in Section 7.8.22
@@ -891,27 +1171,34 @@ type LEEncryptOutput struct {
 }
 
 func (o *LEEncryptOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	copy(o.EncryptedData[:], r.Get(16))
 	return r.Valid()
 }
 
 // LEEncryptSync executes the command specified in Section 7.8.22 synchronously
 func (c *Commands) LEEncryptSync (params LEEncryptInput, result *LEEncryptOutput) (*LEEncryptOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEEncrypt started")
+	}
 	if result == nil {
 		result = &LEEncryptOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0017}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -920,14 +1207,21 @@ func (c *Commands) LEEncryptSync (params LEEncryptInput, result *LEEncryptOutput
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LEEncrypt completed")
+	}
 
+	 return result, err
+}
 // LERandOutput represents the output of the command specified in Section 7.8.23
 type LERandOutput struct {
 	Status uint8
@@ -935,26 +1229,32 @@ type LERandOutput struct {
 }
 
 func (o *LERandOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.RandomNumber = binary.LittleEndian.Uint64(r.Get(8))
 	return r.Valid()
 }
 
 // LERandSync executes the command specified in Section 7.8.23 synchronously
 func (c *Commands) LERandSync (result *LERandOutput) (*LERandOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LERand started")
+	}
 	if result == nil {
 		result = &LERandOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0018}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -963,14 +1263,20 @@ func (c *Commands) LERandSync (result *LERandOutput) (*LERandOutput, error) {
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "1result": result,
+		}).Debug("LERand completed")
+	}
 
+	 return result, err
+}
 // LEEnableEncryptionInput represents the input of the command specified in Section 7.8.24
 type LEEnableEncryptionInput struct {
 	ConnectionHandle uint16
@@ -979,36 +1285,49 @@ type LEEnableEncryptionInput struct {
 }
 
 func (i LEEnableEncryptionInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
 	binary.LittleEndian.PutUint64(w.Put(8), i.RandomNumber)
 	binary.LittleEndian.PutUint16(w.Put(2), i.EncryptedDiversifier)
-	return w.Data()
+	return w.Data
 }
 
 // LEEnableEncryptionSync executes the command specified in Section 7.8.24 synchronously
 func (c *Commands) LEEnableEncryptionSync (params LEEnableEncryptionInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEEnableEncryption started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0019}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LEEnableEncryption completed")
+	}
 
+	 return err
+}
 // LELongTermKeyRequestReplyInput represents the input of the command specified in Section 7.8.25
 type LELongTermKeyRequestReplyInput struct {
 	ConnectionHandle uint16
@@ -1016,10 +1335,10 @@ type LELongTermKeyRequestReplyInput struct {
 }
 
 func (i LELongTermKeyRequestReplyInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
 	copy(w.Put(16), i.LongTermKey[:])
-	return w.Data()
+	return w.Data
 }
 
 // LELongTermKeyRequestReplyOutput represents the output of the command specified in Section 7.8.25
@@ -1029,27 +1348,34 @@ type LELongTermKeyRequestReplyOutput struct {
 }
 
 func (o *LELongTermKeyRequestReplyOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
 }
 
 // LELongTermKeyRequestReplySync executes the command specified in Section 7.8.25 synchronously
 func (c *Commands) LELongTermKeyRequestReplySync (params LELongTermKeyRequestReplyInput, result *LELongTermKeyRequestReplyOutput) (*LELongTermKeyRequestReplyOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LELongTermKeyRequestReply started")
+	}
 	if result == nil {
 		result = &LELongTermKeyRequestReplyOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x001A}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -1058,23 +1384,30 @@ func (c *Commands) LELongTermKeyRequestReplySync (params LELongTermKeyRequestRep
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LELongTermKeyRequestReply completed")
+	}
 
+	 return result, err
+}
 // LELongTermKeyRequestNegativeReplyInput represents the input of the command specified in Section 7.8.26
 type LELongTermKeyRequestNegativeReplyInput struct {
 	ConnectionHandle uint16
 }
 
 func (i LELongTermKeyRequestNegativeReplyInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	return w.Data()
+	return w.Data
 }
 
 // LELongTermKeyRequestNegativeReplyOutput represents the output of the command specified in Section 7.8.26
@@ -1084,27 +1417,34 @@ type LELongTermKeyRequestNegativeReplyOutput struct {
 }
 
 func (o *LELongTermKeyRequestNegativeReplyOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
 }
 
 // LELongTermKeyRequestNegativeReplySync executes the command specified in Section 7.8.26 synchronously
 func (c *Commands) LELongTermKeyRequestNegativeReplySync (params LELongTermKeyRequestNegativeReplyInput, result *LELongTermKeyRequestNegativeReplyOutput) (*LELongTermKeyRequestNegativeReplyOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LELongTermKeyRequestNegativeReply started")
+	}
 	if result == nil {
 		result = &LELongTermKeyRequestNegativeReplyOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x001B}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -1113,14 +1453,21 @@ func (c *Commands) LELongTermKeyRequestNegativeReplySync (params LELongTermKeyRe
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LELongTermKeyRequestNegativeReply completed")
+	}
 
+	 return result, err
+}
 // LEReadSupportedStatesOutput represents the output of the command specified in Section 7.8.27
 type LEReadSupportedStatesOutput struct {
 	Status uint8
@@ -1128,26 +1475,32 @@ type LEReadSupportedStatesOutput struct {
 }
 
 func (o *LEReadSupportedStatesOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.LEStates = binary.LittleEndian.Uint64(r.Get(8))
 	return r.Valid()
 }
 
 // LEReadSupportedStatesSync executes the command specified in Section 7.8.27 synchronously
 func (c *Commands) LEReadSupportedStatesSync (result *LEReadSupportedStatesOutput) (*LEReadSupportedStatesOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LEReadSupportedStates started")
+	}
 	if result == nil {
 		result = &LEReadSupportedStatesOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x001C}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -1156,48 +1509,67 @@ func (c *Commands) LEReadSupportedStatesSync (result *LEReadSupportedStatesOutpu
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "1result": result,
+		}).Debug("LEReadSupportedStates completed")
+	}
 
+	 return result, err
+}
 // LEReceiverTestInput represents the input of the command specified in Section 7.8.28
 type LEReceiverTestInput struct {
 	RXChannel uint8
 }
 
 func (i LEReceiverTestInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.RXChannel)
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.RXChannel))
+	return w.Data
 }
 
 // LEReceiverTestSync executes the command specified in Section 7.8.28 synchronously
 func (c *Commands) LEReceiverTestSync (params LEReceiverTestInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEReceiverTest started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x001D}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LEReceiverTest completed")
+	}
 
+	 return err
+}
 // LEReceiverTestV2Input represents the input of the command specified in Section 7.8.28
 type LEReceiverTestV2Input struct {
 	RXChannel uint8
@@ -1205,35 +1577,48 @@ type LEReceiverTestV2Input struct {
 }
 
 func (i LEReceiverTestV2Input) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.RXChannel)
-	w.PutOne(i.PHY)
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.RXChannel))
+	w.PutOne(uint8(i.PHY))
+	return w.Data
 }
 
 // LEReceiverTestV2Sync executes the command specified in Section 7.8.28 synchronously
 func (c *Commands) LEReceiverTestV2Sync (params LEReceiverTestV2Input) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEReceiverTestV2 started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0033}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LEReceiverTestV2 completed")
+	}
 
+	 return err
+}
 // LEReceiverTestV3Input represents the input of the command specified in Section 7.8.28
 type LEReceiverTestV3Input struct {
 	RXChannel uint8
@@ -1247,46 +1632,59 @@ type LEReceiverTestV3Input struct {
 }
 
 func (i LEReceiverTestV3Input) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.RXChannel)
-	w.PutOne(i.PHY)
-	w.PutOne(i.ModulationIndex)
-	w.PutOne(i.ExpectedCTELength)
-	w.PutOne(i.ExpectedCTEType)
-	w.PutOne(i.SlotDurations)
-	w.PutOne(i.SwitchingPatternLength)
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.RXChannel))
+	w.PutOne(uint8(i.PHY))
+	w.PutOne(uint8(i.ModulationIndex))
+	w.PutOne(uint8(i.ExpectedCTELength))
+	w.PutOne(uint8(i.ExpectedCTEType))
+	w.PutOne(uint8(i.SlotDurations))
+	w.PutOne(uint8(i.SwitchingPatternLength))
 	if len(i.AntennaIDs) != int(i.SwitchingPatternLength) {
 		panic("len(i.AntennaIDs) != int(i.SwitchingPatternLength)")
 	}
 	for _, m := range i.AntennaIDs {
-		w.PutOne(m)
+		w.PutOne(uint8(m))
 	}
-	return w.Data()
+	return w.Data
 }
 
 // LEReceiverTestV3Sync executes the command specified in Section 7.8.28 synchronously
 func (c *Commands) LEReceiverTestV3Sync (params LEReceiverTestV3Input) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEReceiverTestV3 started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x004F}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LEReceiverTestV3 completed")
+	}
 
+	 return err
+}
 // LETransmitterTestInput represents the input of the command specified in Section 7.8.29
 type LETransmitterTestInput struct {
 	TXChannel uint8
@@ -1295,36 +1693,49 @@ type LETransmitterTestInput struct {
 }
 
 func (i LETransmitterTestInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.TXChannel)
-	w.PutOne(i.TestDataLength)
-	w.PutOne(i.PacketPayload)
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.TXChannel))
+	w.PutOne(uint8(i.TestDataLength))
+	w.PutOne(uint8(i.PacketPayload))
+	return w.Data
 }
 
 // LETransmitterTestSync executes the command specified in Section 7.8.29 synchronously
 func (c *Commands) LETransmitterTestSync (params LETransmitterTestInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LETransmitterTest started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x001E}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LETransmitterTest completed")
+	}
 
+	 return err
+}
 // LETransmitterTestV2Input represents the input of the command specified in Section 7.8.29
 type LETransmitterTestV2Input struct {
 	TXChannel uint8
@@ -1334,37 +1745,50 @@ type LETransmitterTestV2Input struct {
 }
 
 func (i LETransmitterTestV2Input) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.TXChannel)
-	w.PutOne(i.TestDataLength)
-	w.PutOne(i.PacketPayload)
-	w.PutOne(i.PHY)
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.TXChannel))
+	w.PutOne(uint8(i.TestDataLength))
+	w.PutOne(uint8(i.PacketPayload))
+	w.PutOne(uint8(i.PHY))
+	return w.Data
 }
 
 // LETransmitterTestV2Sync executes the command specified in Section 7.8.29 synchronously
 func (c *Commands) LETransmitterTestV2Sync (params LETransmitterTestV2Input) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LETransmitterTestV2 started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0034}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LETransmitterTestV2 completed")
+	}
 
+	 return err
+}
 // LETransmitterTestV3Input represents the input of the command specified in Section 7.8.29
 type LETransmitterTestV3Input struct {
 	TXChannel uint8
@@ -1378,46 +1802,59 @@ type LETransmitterTestV3Input struct {
 }
 
 func (i LETransmitterTestV3Input) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.TXChannel)
-	w.PutOne(i.TestDataLength)
-	w.PutOne(i.PacketPayload)
-	w.PutOne(i.PHY)
-	w.PutOne(i.CTELength)
-	w.PutOne(i.CTEType)
-	w.PutOne(i.SwitchingPatternLength)
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.TXChannel))
+	w.PutOne(uint8(i.TestDataLength))
+	w.PutOne(uint8(i.PacketPayload))
+	w.PutOne(uint8(i.PHY))
+	w.PutOne(uint8(i.CTELength))
+	w.PutOne(uint8(i.CTEType))
+	w.PutOne(uint8(i.SwitchingPatternLength))
 	if len(i.AntennaIDs) != int(i.SwitchingPatternLength) {
 		panic("len(i.AntennaIDs) != int(i.SwitchingPatternLength)")
 	}
 	for _, m := range i.AntennaIDs {
-		w.PutOne(m)
+		w.PutOne(uint8(m))
 	}
-	return w.Data()
+	return w.Data
 }
 
 // LETransmitterTestV3Sync executes the command specified in Section 7.8.29 synchronously
 func (c *Commands) LETransmitterTestV3Sync (params LETransmitterTestV3Input) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LETransmitterTestV3 started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0050}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LETransmitterTestV3 completed")
+	}
 
+	 return err
+}
 // LETransmitterTestV4Input represents the input of the command specified in Section 7.8.29
 type LETransmitterTestV4Input struct {
 	TXChannel uint8
@@ -1432,47 +1869,60 @@ type LETransmitterTestV4Input struct {
 }
 
 func (i LETransmitterTestV4Input) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.TXChannel)
-	w.PutOne(i.TestDataLength)
-	w.PutOne(i.PacketPayload)
-	w.PutOne(i.PHY)
-	w.PutOne(i.CTELength)
-	w.PutOne(i.CTEType)
-	w.PutOne(i.SwitchingPatternLength)
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.TXChannel))
+	w.PutOne(uint8(i.TestDataLength))
+	w.PutOne(uint8(i.PacketPayload))
+	w.PutOne(uint8(i.PHY))
+	w.PutOne(uint8(i.CTELength))
+	w.PutOne(uint8(i.CTEType))
+	w.PutOne(uint8(i.SwitchingPatternLength))
 	if len(i.AntennaIDs) != int(i.SwitchingPatternLength) {
 		panic("len(i.AntennaIDs) != int(i.SwitchingPatternLength)")
 	}
 	for _, m := range i.AntennaIDs {
-		w.PutOne(m)
+		w.PutOne(uint8(m))
 	}
-	w.PutOne(i.TransmitPowerLevel)
-	return w.Data()
+	w.PutOne(uint8(i.TransmitPowerLevel))
+	return w.Data
 }
 
 // LETransmitterTestV4Sync executes the command specified in Section 7.8.29 synchronously
 func (c *Commands) LETransmitterTestV4Sync (params LETransmitterTestV4Input) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LETransmitterTestV4 started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x007B}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LETransmitterTestV4 completed")
+	}
 
+	 return err
+}
 // LETestEndOutput represents the output of the command specified in Section 7.8.30
 type LETestEndOutput struct {
 	Status uint8
@@ -1480,26 +1930,32 @@ type LETestEndOutput struct {
 }
 
 func (o *LETestEndOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.NumPackets = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
 }
 
 // LETestEndSync executes the command specified in Section 7.8.30 synchronously
 func (c *Commands) LETestEndSync (result *LETestEndOutput) (*LETestEndOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LETestEnd started")
+	}
 	if result == nil {
 		result = &LETestEndOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x001F}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -1508,14 +1964,20 @@ func (c *Commands) LETestEndSync (result *LETestEndOutput) (*LETestEndOutput, er
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "1result": result,
+		}).Debug("LETestEnd completed")
+	}
 
+	 return result, err
+}
 // LERemoteConnectionParameterRequestReplyInput represents the input of the command specified in Section 7.8.31
 type LERemoteConnectionParameterRequestReplyInput struct {
 	ConnectionHandle uint16
@@ -1528,7 +1990,7 @@ type LERemoteConnectionParameterRequestReplyInput struct {
 }
 
 func (i LERemoteConnectionParameterRequestReplyInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
 	binary.LittleEndian.PutUint16(w.Put(2), i.IntervalMin)
 	binary.LittleEndian.PutUint16(w.Put(2), i.IntervalMax)
@@ -1536,7 +1998,7 @@ func (i LERemoteConnectionParameterRequestReplyInput) encode(data []byte) []byte
 	binary.LittleEndian.PutUint16(w.Put(2), i.Timeout)
 	binary.LittleEndian.PutUint16(w.Put(2), i.MinCELength)
 	binary.LittleEndian.PutUint16(w.Put(2), i.MaxCELength)
-	return w.Data()
+	return w.Data
 }
 
 // LERemoteConnectionParameterRequestReplyOutput represents the output of the command specified in Section 7.8.31
@@ -1546,27 +2008,34 @@ type LERemoteConnectionParameterRequestReplyOutput struct {
 }
 
 func (o *LERemoteConnectionParameterRequestReplyOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
 }
 
 // LERemoteConnectionParameterRequestReplySync executes the command specified in Section 7.8.31 synchronously
 func (c *Commands) LERemoteConnectionParameterRequestReplySync (params LERemoteConnectionParameterRequestReplyInput, result *LERemoteConnectionParameterRequestReplyOutput) (*LERemoteConnectionParameterRequestReplyOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LERemoteConnectionParameterRequestReply started")
+	}
 	if result == nil {
 		result = &LERemoteConnectionParameterRequestReplyOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0020}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -1575,14 +2044,21 @@ func (c *Commands) LERemoteConnectionParameterRequestReplySync (params LERemoteC
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LERemoteConnectionParameterRequestReply completed")
+	}
 
+	 return result, err
+}
 // LESetDataLengthInput represents the input of the command specified in Section 7.8.33
 type LESetDataLengthInput struct {
 	ConnectionHandle uint16
@@ -1591,11 +2067,11 @@ type LESetDataLengthInput struct {
 }
 
 func (i LESetDataLengthInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
 	binary.LittleEndian.PutUint16(w.Put(2), i.TXOctets)
 	binary.LittleEndian.PutUint16(w.Put(2), i.TXTime)
-	return w.Data()
+	return w.Data
 }
 
 // LESetDataLengthOutput represents the output of the command specified in Section 7.8.33
@@ -1605,27 +2081,34 @@ type LESetDataLengthOutput struct {
 }
 
 func (o *LESetDataLengthOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
 }
 
 // LESetDataLengthSync executes the command specified in Section 7.8.33 synchronously
 func (c *Commands) LESetDataLengthSync (params LESetDataLengthInput, result *LESetDataLengthOutput) (*LESetDataLengthOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetDataLength started")
+	}
 	if result == nil {
 		result = &LESetDataLengthOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0022}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -1634,14 +2117,21 @@ func (c *Commands) LESetDataLengthSync (params LESetDataLengthInput, result *LES
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LESetDataLength completed")
+	}
 
+	 return result, err
+}
 // LEReadSuggestedDefaultDataLengthOutput represents the output of the command specified in Section 7.8.34
 type LEReadSuggestedDefaultDataLengthOutput struct {
 	Status uint8
@@ -1650,8 +2140,8 @@ type LEReadSuggestedDefaultDataLengthOutput struct {
 }
 
 func (o *LEReadSuggestedDefaultDataLengthOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.SuggestedMaxTXOctets = binary.LittleEndian.Uint16(r.Get(2))
 	o.SuggestedMaxTXTime = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
@@ -1659,18 +2149,24 @@ func (o *LEReadSuggestedDefaultDataLengthOutput) decode(data []byte) bool {
 
 // LEReadSuggestedDefaultDataLengthSync executes the command specified in Section 7.8.34 synchronously
 func (c *Commands) LEReadSuggestedDefaultDataLengthSync (result *LEReadSuggestedDefaultDataLengthOutput) (*LEReadSuggestedDefaultDataLengthOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LEReadSuggestedDefaultDataLength started")
+	}
 	if result == nil {
 		result = &LEReadSuggestedDefaultDataLengthOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0023}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -1679,14 +2175,20 @@ func (c *Commands) LEReadSuggestedDefaultDataLengthSync (result *LEReadSuggested
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "1result": result,
+		}).Debug("LEReadSuggestedDefaultDataLength completed")
+	}
 
+	 return result, err
+}
 // LEWriteSuggestedDefaultDataLengthInput represents the input of the command specified in Section 7.8.35
 type LEWriteSuggestedDefaultDataLengthInput struct {
 	SuggestedMaxTXOctets uint16
@@ -1694,69 +2196,95 @@ type LEWriteSuggestedDefaultDataLengthInput struct {
 }
 
 func (i LEWriteSuggestedDefaultDataLengthInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.SuggestedMaxTXOctets)
 	binary.LittleEndian.PutUint16(w.Put(2), i.SuggestedMaxTXTime)
-	return w.Data()
+	return w.Data
 }
 
 // LEWriteSuggestedDefaultDataLengthSync executes the command specified in Section 7.8.35 synchronously
 func (c *Commands) LEWriteSuggestedDefaultDataLengthSync (params LEWriteSuggestedDefaultDataLengthInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEWriteSuggestedDefaultDataLength started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0024}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LEWriteSuggestedDefaultDataLength completed")
+	}
 
+	 return err
+}
 // LEReadLocalP256PublicKeyInput represents the input of the command specified in Section 7.8.36
 type LEReadLocalP256PublicKeyInput struct {
 	RemoteP256PublicKey [64]byte
 }
 
 func (i LEReadLocalP256PublicKeyInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	copy(w.Put(64), i.RemoteP256PublicKey[:])
-	return w.Data()
+	return w.Data
 }
 
 // LEReadLocalP256PublicKeySync executes the command specified in Section 7.8.36 synchronously
 func (c *Commands) LEReadLocalP256PublicKeySync (params LEReadLocalP256PublicKeyInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEReadLocalP256PublicKey started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0026}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LEReadLocalP256PublicKey completed")
+	}
 
+	 return err
+}
 // LEGenerateDHKeyV2Input represents the input of the command specified in Section 7.8.37
 type LEGenerateDHKeyV2Input struct {
 	RemoteP256PublicKey [64]byte
@@ -1764,133 +2292,183 @@ type LEGenerateDHKeyV2Input struct {
 }
 
 func (i LEGenerateDHKeyV2Input) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	copy(w.Put(64), i.RemoteP256PublicKey[:])
-	w.PutOne(i.KeyType)
-	return w.Data()
+	w.PutOne(uint8(i.KeyType))
+	return w.Data
 }
 
 // LEGenerateDHKeyV2Sync executes the command specified in Section 7.8.37 synchronously
 func (c *Commands) LEGenerateDHKeyV2Sync (params LEGenerateDHKeyV2Input) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEGenerateDHKeyV2 started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x005E}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LEGenerateDHKeyV2 completed")
+	}
 
+	 return err
+}
 // LEAddDeviceToResolvingListInput represents the input of the command specified in Section 7.8.38
 type LEAddDeviceToResolvingListInput struct {
-	PeerIdentityAddressType uint8
-	PeerIdentityAddress [6]byte
+	PeerIdentityAddressType bleutil.MacAddrType
+	PeerIdentityAddress bleutil.MacAddr
 	PeerIRK [16]byte
 	LocalIRK [16]byte
 }
 
 func (i LEAddDeviceToResolvingListInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.PeerIdentityAddressType)
-	copy(w.Put(6), i.PeerIdentityAddress[:])
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.PeerIdentityAddressType))
+	i.PeerIdentityAddress.Encode(w.Put(6))
 	copy(w.Put(16), i.PeerIRK[:])
 	copy(w.Put(16), i.LocalIRK[:])
-	return w.Data()
+	return w.Data
 }
 
 // LEAddDeviceToResolvingListSync executes the command specified in Section 7.8.38 synchronously
 func (c *Commands) LEAddDeviceToResolvingListSync (params LEAddDeviceToResolvingListInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEAddDeviceToResolvingList started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0027}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LEAddDeviceToResolvingList completed")
+	}
 
+	 return err
+}
 // LERemoveDeviceFromResolvingListInput represents the input of the command specified in Section 7.8.39
 type LERemoveDeviceFromResolvingListInput struct {
-	PeerIdentityAddressType uint8
-	PeerDeviceAddress [6]byte
+	PeerIdentityAddressType bleutil.MacAddrType
+	PeerDeviceAddress bleutil.MacAddr
 }
 
 func (i LERemoveDeviceFromResolvingListInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.PeerIdentityAddressType)
-	copy(w.Put(6), i.PeerDeviceAddress[:])
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.PeerIdentityAddressType))
+	i.PeerDeviceAddress.Encode(w.Put(6))
+	return w.Data
 }
 
 // LERemoveDeviceFromResolvingListSync executes the command specified in Section 7.8.39 synchronously
 func (c *Commands) LERemoveDeviceFromResolvingListSync (params LERemoveDeviceFromResolvingListInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LERemoveDeviceFromResolvingList started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0028}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LERemoveDeviceFromResolvingList completed")
+	}
 
+	 return err
+}
 // LEClearResolvingListSync executes the command specified in Section 7.8.40 synchronously
 func (c *Commands) LEClearResolvingListSync () error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LEClearResolvingList started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0029}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+		}).Debug("LEClearResolvingList completed")
+	}
 
+	 return err
+}
 // LEReadResolvingListSizeOutput represents the output of the command specified in Section 7.8.41
 type LEReadResolvingListSizeOutput struct {
 	Status uint8
@@ -1898,26 +2476,32 @@ type LEReadResolvingListSizeOutput struct {
 }
 
 func (o *LEReadResolvingListSizeOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
-	o.ResolvingListSize = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
+	o.ResolvingListSize = uint8(r.GetOne())
 	return r.Valid()
 }
 
 // LEReadResolvingListSizeSync executes the command specified in Section 7.8.41 synchronously
 func (c *Commands) LEReadResolvingListSizeSync (result *LEReadResolvingListSizeOutput) (*LEReadResolvingListSizeOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LEReadResolvingListSize started")
+	}
 	if result == nil {
 		result = &LEReadResolvingListSizeOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x002A}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -1926,55 +2510,68 @@ func (c *Commands) LEReadResolvingListSizeSync (result *LEReadResolvingListSizeO
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "1result": result,
+		}).Debug("LEReadResolvingListSize completed")
+	}
 
+	 return result, err
+}
 // LEReadPeerResolvableAddressInput represents the input of the command specified in Section 7.8.42
 type LEReadPeerResolvableAddressInput struct {
-	PeerIdentityAddressType uint8
-	PeerIdentityAddress [6]byte
+	PeerIdentityAddressType bleutil.MacAddrType
+	PeerIdentityAddress bleutil.MacAddr
 }
 
 func (i LEReadPeerResolvableAddressInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.PeerIdentityAddressType)
-	copy(w.Put(6), i.PeerIdentityAddress[:])
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.PeerIdentityAddressType))
+	i.PeerIdentityAddress.Encode(w.Put(6))
+	return w.Data
 }
 
 // LEReadPeerResolvableAddressOutput represents the output of the command specified in Section 7.8.42
 type LEReadPeerResolvableAddressOutput struct {
 	Status uint8
-	PeerResolvableAddress [6]byte
+	PeerResolvableAddress bleutil.MacAddr
 }
 
 func (o *LEReadPeerResolvableAddressOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
-	copy(o.PeerResolvableAddress[:], r.Get(6))
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
+	o.PeerResolvableAddress.Decode(r.Get(6))
 	return r.Valid()
 }
 
 // LEReadPeerResolvableAddressSync executes the command specified in Section 7.8.42 synchronously
 func (c *Commands) LEReadPeerResolvableAddressSync (params LEReadPeerResolvableAddressInput, result *LEReadPeerResolvableAddressOutput) (*LEReadPeerResolvableAddressOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEReadPeerResolvableAddress started")
+	}
 	if result == nil {
 		result = &LEReadPeerResolvableAddressOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x002B}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -1983,55 +2580,69 @@ func (c *Commands) LEReadPeerResolvableAddressSync (params LEReadPeerResolvableA
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LEReadPeerResolvableAddress completed")
+	}
 
+	 return result, err
+}
 // LEReadLocalResolvableAddressInput represents the input of the command specified in Section 7.8.43
 type LEReadLocalResolvableAddressInput struct {
-	PeerIdentityAddressType uint8
-	PeerIdentityAddress [6]byte
+	PeerIdentityAddressType bleutil.MacAddrType
+	PeerIdentityAddress bleutil.MacAddr
 }
 
 func (i LEReadLocalResolvableAddressInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.PeerIdentityAddressType)
-	copy(w.Put(6), i.PeerIdentityAddress[:])
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.PeerIdentityAddressType))
+	i.PeerIdentityAddress.Encode(w.Put(6))
+	return w.Data
 }
 
 // LEReadLocalResolvableAddressOutput represents the output of the command specified in Section 7.8.43
 type LEReadLocalResolvableAddressOutput struct {
 	Status uint8
-	LocalResolvableAddress [6]byte
+	LocalResolvableAddress bleutil.MacAddr
 }
 
 func (o *LEReadLocalResolvableAddressOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
-	copy(o.LocalResolvableAddress[:], r.Get(6))
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
+	o.LocalResolvableAddress.Decode(r.Get(6))
 	return r.Valid()
 }
 
 // LEReadLocalResolvableAddressSync executes the command specified in Section 7.8.43 synchronously
 func (c *Commands) LEReadLocalResolvableAddressSync (params LEReadLocalResolvableAddressInput, result *LEReadLocalResolvableAddressOutput) (*LEReadLocalResolvableAddressOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEReadLocalResolvableAddress started")
+	}
 	if result == nil {
 		result = &LEReadLocalResolvableAddressOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x002C}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -2040,82 +2651,115 @@ func (c *Commands) LEReadLocalResolvableAddressSync (params LEReadLocalResolvabl
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LEReadLocalResolvableAddress completed")
+	}
 
+	 return result, err
+}
 // LESetAddressResolutionEnableInput represents the input of the command specified in Section 7.8.44
 type LESetAddressResolutionEnableInput struct {
 	AddressResolutionEnable uint8
 }
 
 func (i LESetAddressResolutionEnableInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.AddressResolutionEnable)
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.AddressResolutionEnable))
+	return w.Data
 }
 
 // LESetAddressResolutionEnableSync executes the command specified in Section 7.8.44 synchronously
 func (c *Commands) LESetAddressResolutionEnableSync (params LESetAddressResolutionEnableInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetAddressResolutionEnable started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x002D}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetAddressResolutionEnable completed")
+	}
 
+	 return err
+}
 // LESetResolvablePrivateAddressTimeoutInput represents the input of the command specified in Section 7.8.45
 type LESetResolvablePrivateAddressTimeoutInput struct {
 	RPATimeout uint16
 }
 
 func (i LESetResolvablePrivateAddressTimeoutInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.RPATimeout)
-	return w.Data()
+	return w.Data
 }
 
 // LESetResolvablePrivateAddressTimeoutSync executes the command specified in Section 7.8.45 synchronously
 func (c *Commands) LESetResolvablePrivateAddressTimeoutSync (params LESetResolvablePrivateAddressTimeoutInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetResolvablePrivateAddressTimeout started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x002E}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetResolvablePrivateAddressTimeout completed")
+	}
 
+	 return err
+}
 // LEReadMaximumDataLengthOutput represents the output of the command specified in Section 7.8.46
 type LEReadMaximumDataLengthOutput struct {
 	Status uint8
@@ -2126,8 +2770,8 @@ type LEReadMaximumDataLengthOutput struct {
 }
 
 func (o *LEReadMaximumDataLengthOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.SupportedMaxTXOctets = binary.LittleEndian.Uint16(r.Get(2))
 	o.SupportedMaxTXTime = binary.LittleEndian.Uint16(r.Get(2))
 	o.SupportedMaxRXOctets = binary.LittleEndian.Uint16(r.Get(2))
@@ -2137,18 +2781,24 @@ func (o *LEReadMaximumDataLengthOutput) decode(data []byte) bool {
 
 // LEReadMaximumDataLengthSync executes the command specified in Section 7.8.46 synchronously
 func (c *Commands) LEReadMaximumDataLengthSync (result *LEReadMaximumDataLengthOutput) (*LEReadMaximumDataLengthOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LEReadMaximumDataLength started")
+	}
 	if result == nil {
 		result = &LEReadMaximumDataLengthOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x002F}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -2157,23 +2807,29 @@ func (c *Commands) LEReadMaximumDataLengthSync (result *LEReadMaximumDataLengthO
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "1result": result,
+		}).Debug("LEReadMaximumDataLength completed")
+	}
 
+	 return result, err
+}
 // LEReadPHYInput represents the input of the command specified in Section 7.8.47
 type LEReadPHYInput struct {
 	ConnectionHandle uint16
 }
 
 func (i LEReadPHYInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	return w.Data()
+	return w.Data
 }
 
 // LEReadPHYOutput represents the output of the command specified in Section 7.8.47
@@ -2185,29 +2841,36 @@ type LEReadPHYOutput struct {
 }
 
 func (o *LEReadPHYOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
-	o.TXPHY = r.GetOne()
-	o.RXPHY = r.GetOne()
+	o.TXPHY = uint8(r.GetOne())
+	o.RXPHY = uint8(r.GetOne())
 	return r.Valid()
 }
 
 // LEReadPHYSync executes the command specified in Section 7.8.47 synchronously
 func (c *Commands) LEReadPHYSync (params LEReadPHYInput, result *LEReadPHYOutput) (*LEReadPHYOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEReadPHY started")
+	}
 	if result == nil {
 		result = &LEReadPHYOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0030}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -2216,14 +2879,21 @@ func (c *Commands) LEReadPHYSync (params LEReadPHYInput, result *LEReadPHYOutput
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LEReadPHY completed")
+	}
 
+	 return result, err
+}
 // LESetDefaultPHYInput represents the input of the command specified in Section 7.8.48
 type LESetDefaultPHYInput struct {
 	AllPHYs uint8
@@ -2232,36 +2902,49 @@ type LESetDefaultPHYInput struct {
 }
 
 func (i LESetDefaultPHYInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.AllPHYs)
-	w.PutOne(i.TXPHYs)
-	w.PutOne(i.RXPHYs)
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.AllPHYs))
+	w.PutOne(uint8(i.TXPHYs))
+	w.PutOne(uint8(i.RXPHYs))
+	return w.Data
 }
 
 // LESetDefaultPHYSync executes the command specified in Section 7.8.48 synchronously
 func (c *Commands) LESetDefaultPHYSync (params LESetDefaultPHYInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetDefaultPHY started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0031}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetDefaultPHY completed")
+	}
 
+	 return err
+}
 // LESetPHYInput represents the input of the command specified in Section 7.8.49
 type LESetPHYInput struct {
 	ConnectionHandle uint16
@@ -2272,74 +2955,100 @@ type LESetPHYInput struct {
 }
 
 func (i LESetPHYInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	w.PutOne(i.AllPHYs)
-	w.PutOne(i.TXPHYs)
-	w.PutOne(i.RXPHYs)
+	w.PutOne(uint8(i.AllPHYs))
+	w.PutOne(uint8(i.TXPHYs))
+	w.PutOne(uint8(i.RXPHYs))
 	binary.LittleEndian.PutUint16(w.Put(2), i.PHYOptions)
-	return w.Data()
+	return w.Data
 }
 
 // LESetPHYSync executes the command specified in Section 7.8.49 synchronously
 func (c *Commands) LESetPHYSync (params LESetPHYInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetPHY started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0032}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetPHY completed")
+	}
 
+	 return err
+}
 // LESetAdvertisingSetRandomAddressInput represents the input of the command specified in Section 7.8.52
 type LESetAdvertisingSetRandomAddressInput struct {
 	AdvertisingHandle uint8
-	AdvertisingRandomAddress [6]byte
+	AdvertisingRandomAddress bleutil.MacAddr
 }
 
 func (i LESetAdvertisingSetRandomAddressInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.AdvertisingHandle)
-	copy(w.Put(6), i.AdvertisingRandomAddress[:])
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.AdvertisingHandle))
+	i.AdvertisingRandomAddress.Encode(w.Put(6))
+	return w.Data
 }
 
 // LESetAdvertisingSetRandomAddressSync executes the command specified in Section 7.8.52 synchronously
 func (c *Commands) LESetAdvertisingSetRandomAddressSync (params LESetAdvertisingSetRandomAddressInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetAdvertisingSetRandomAddress started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0035}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetAdvertisingSetRandomAddress completed")
+	}
 
+	 return err
+}
 // LESetExtendedAdvertisingParametersInput represents the input of the command specified in Section 7.8.53
 type LESetExtendedAdvertisingParametersInput struct {
 	AdvertisingHandle uint8
@@ -2347,9 +3056,9 @@ type LESetExtendedAdvertisingParametersInput struct {
 	PrimaryAdvertisingIntervalMin uint32
 	PrimaryAdvertisingIntervalMax uint32
 	PrimaryAdvertisingChannelMap uint8
-	OwnAddressType uint8
-	PeerAddressType uint8
-	PeerAddress [6]byte
+	OwnAddressType bleutil.MacAddrType
+	PeerAddressType bleutil.MacAddrType
+	PeerAddress bleutil.MacAddr
 	AdvertisingFilterPolicy uint8
 	AdvertisingTXPower uint8
 	PrimaryAdvertisingPHY uint8
@@ -2360,23 +3069,23 @@ type LESetExtendedAdvertisingParametersInput struct {
 }
 
 func (i LESetExtendedAdvertisingParametersInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.AdvertisingHandle)
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.AdvertisingHandle))
 	binary.LittleEndian.PutUint16(w.Put(2), i.AdvertisingEventProperties)
-	encodeUint24(w.Put(3), i.PrimaryAdvertisingIntervalMin)
-	encodeUint24(w.Put(3), i.PrimaryAdvertisingIntervalMax)
-	w.PutOne(i.PrimaryAdvertisingChannelMap)
-	w.PutOne(i.OwnAddressType)
-	w.PutOne(i.PeerAddressType)
-	copy(w.Put(6), i.PeerAddress[:])
-	w.PutOne(i.AdvertisingFilterPolicy)
-	w.PutOne(i.AdvertisingTXPower)
-	w.PutOne(i.PrimaryAdvertisingPHY)
-	w.PutOne(i.SecondaryAdvertisingMaxSkip)
-	w.PutOne(i.SecondaryAdvertisingPHY)
-	w.PutOne(i.AdvertisingSID)
-	w.PutOne(i.ScanRequestNotificationEnable)
-	return w.Data()
+	bleutil.EncodeUint24(w.Put(3), i.PrimaryAdvertisingIntervalMin)
+	bleutil.EncodeUint24(w.Put(3), i.PrimaryAdvertisingIntervalMax)
+	w.PutOne(uint8(i.PrimaryAdvertisingChannelMap))
+	w.PutOne(uint8(i.OwnAddressType))
+	w.PutOne(uint8(i.PeerAddressType))
+	i.PeerAddress.Encode(w.Put(6))
+	w.PutOne(uint8(i.AdvertisingFilterPolicy))
+	w.PutOne(uint8(i.AdvertisingTXPower))
+	w.PutOne(uint8(i.PrimaryAdvertisingPHY))
+	w.PutOne(uint8(i.SecondaryAdvertisingMaxSkip))
+	w.PutOne(uint8(i.SecondaryAdvertisingPHY))
+	w.PutOne(uint8(i.AdvertisingSID))
+	w.PutOne(uint8(i.ScanRequestNotificationEnable))
+	return w.Data
 }
 
 // LESetExtendedAdvertisingParametersOutput represents the output of the command specified in Section 7.8.53
@@ -2386,27 +3095,34 @@ type LESetExtendedAdvertisingParametersOutput struct {
 }
 
 func (o *LESetExtendedAdvertisingParametersOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
-	o.SelectedTXPower = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
+	o.SelectedTXPower = uint8(r.GetOne())
 	return r.Valid()
 }
 
 // LESetExtendedAdvertisingParametersSync executes the command specified in Section 7.8.53 synchronously
 func (c *Commands) LESetExtendedAdvertisingParametersSync (params LESetExtendedAdvertisingParametersInput, result *LESetExtendedAdvertisingParametersOutput) (*LESetExtendedAdvertisingParametersOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetExtendedAdvertisingParameters started")
+	}
 	if result == nil {
 		result = &LESetExtendedAdvertisingParametersOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0036}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -2415,14 +3131,21 @@ func (c *Commands) LESetExtendedAdvertisingParametersSync (params LESetExtendedA
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LESetExtendedAdvertisingParameters completed")
+	}
 
+	 return result, err
+}
 // LESetExtendedAdvertisingDataInput represents the input of the command specified in Section 7.8.54
 type LESetExtendedAdvertisingDataInput struct {
 	AdvertisingHandle uint8
@@ -2433,38 +3156,51 @@ type LESetExtendedAdvertisingDataInput struct {
 }
 
 func (i LESetExtendedAdvertisingDataInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.AdvertisingHandle)
-	w.PutOne(i.Operation)
-	w.PutOne(i.FragmentPreference)
-	w.PutOne(i.AdvertisingDataLength)
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.AdvertisingHandle))
+	w.PutOne(uint8(i.Operation))
+	w.PutOne(uint8(i.FragmentPreference))
+	w.PutOne(uint8(i.AdvertisingDataLength))
 	w.PutSlice(i.AdvertisingData)
-	return w.Data()
+	return w.Data
 }
 
 // LESetExtendedAdvertisingDataSync executes the command specified in Section 7.8.54 synchronously
 func (c *Commands) LESetExtendedAdvertisingDataSync (params LESetExtendedAdvertisingDataInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetExtendedAdvertisingData started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0037}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetExtendedAdvertisingData completed")
+	}
 
+	 return err
+}
 // LESetExtendedScanResponseDataInput represents the input of the command specified in Section 7.8.55
 type LESetExtendedScanResponseDataInput struct {
 	AdvertisingHandle uint8
@@ -2475,38 +3211,51 @@ type LESetExtendedScanResponseDataInput struct {
 }
 
 func (i LESetExtendedScanResponseDataInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.AdvertisingHandle)
-	w.PutOne(i.Operation)
-	w.PutOne(i.FragmentPreference)
-	w.PutOne(i.ScanResponseDataLength)
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.AdvertisingHandle))
+	w.PutOne(uint8(i.Operation))
+	w.PutOne(uint8(i.FragmentPreference))
+	w.PutOne(uint8(i.ScanResponseDataLength))
 	w.PutSlice(i.ScanResponseData)
-	return w.Data()
+	return w.Data
 }
 
 // LESetExtendedScanResponseDataSync executes the command specified in Section 7.8.55 synchronously
 func (c *Commands) LESetExtendedScanResponseDataSync (params LESetExtendedScanResponseDataInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetExtendedScanResponseData started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0038}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetExtendedScanResponseData completed")
+	}
 
+	 return err
+}
 // LESetExtendedAdvertisingEnableInput represents the input of the command specified in Section 7.8.56
 type LESetExtendedAdvertisingEnableInput struct {
 	Enable uint8
@@ -2517,14 +3266,14 @@ type LESetExtendedAdvertisingEnableInput struct {
 }
 
 func (i LESetExtendedAdvertisingEnableInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.Enable)
-	w.PutOne(i.NumSets)
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.Enable))
+	w.PutOne(uint8(i.NumSets))
 	if len(i.AdvertisingHandle) != int(i.NumSets) {
 		panic("len(i.AdvertisingHandle) != int(i.NumSets)")
 	}
 	for _, m := range i.AdvertisingHandle {
-		w.PutOne(m)
+		w.PutOne(uint8(m))
 	}
 	if len(i.Duration) != int(i.NumSets) {
 		panic("len(i.Duration) != int(i.NumSets)")
@@ -2536,34 +3285,47 @@ func (i LESetExtendedAdvertisingEnableInput) encode(data []byte) []byte {
 		panic("len(i.MaxExtendedAdvertisingEvents) != int(i.NumSets)")
 	}
 	for _, m := range i.MaxExtendedAdvertisingEvents {
-		w.PutOne(m)
+		w.PutOne(uint8(m))
 	}
-	return w.Data()
+	return w.Data
 }
 
 // LESetExtendedAdvertisingEnableSync executes the command specified in Section 7.8.56 synchronously
 func (c *Commands) LESetExtendedAdvertisingEnableSync (params LESetExtendedAdvertisingEnableInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetExtendedAdvertisingEnable started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0039}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetExtendedAdvertisingEnable completed")
+	}
 
+	 return err
+}
 // LEReadMaximumAdvertisingDataLengthOutput represents the output of the command specified in Section 7.8.57
 type LEReadMaximumAdvertisingDataLengthOutput struct {
 	Status uint8
@@ -2571,26 +3333,32 @@ type LEReadMaximumAdvertisingDataLengthOutput struct {
 }
 
 func (o *LEReadMaximumAdvertisingDataLengthOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.MaxAdvertisingDataLength = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
 }
 
 // LEReadMaximumAdvertisingDataLengthSync executes the command specified in Section 7.8.57 synchronously
 func (c *Commands) LEReadMaximumAdvertisingDataLengthSync (result *LEReadMaximumAdvertisingDataLengthOutput) (*LEReadMaximumAdvertisingDataLengthOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LEReadMaximumAdvertisingDataLength started")
+	}
 	if result == nil {
 		result = &LEReadMaximumAdvertisingDataLengthOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x003A}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -2599,14 +3367,20 @@ func (c *Commands) LEReadMaximumAdvertisingDataLengthSync (result *LEReadMaximum
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "1result": result,
+		}).Debug("LEReadMaximumAdvertisingDataLength completed")
+	}
 
+	 return result, err
+}
 // LEReadNumberofSupportedAdvertisingSetsOutput represents the output of the command specified in Section 7.8.58
 type LEReadNumberofSupportedAdvertisingSetsOutput struct {
 	Status uint8
@@ -2614,26 +3388,32 @@ type LEReadNumberofSupportedAdvertisingSetsOutput struct {
 }
 
 func (o *LEReadNumberofSupportedAdvertisingSetsOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
-	o.NumSupportedAdvertisingSets = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
+	o.NumSupportedAdvertisingSets = uint8(r.GetOne())
 	return r.Valid()
 }
 
 // LEReadNumberofSupportedAdvertisingSetsSync executes the command specified in Section 7.8.58 synchronously
 func (c *Commands) LEReadNumberofSupportedAdvertisingSetsSync (result *LEReadNumberofSupportedAdvertisingSetsOutput) (*LEReadNumberofSupportedAdvertisingSetsOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LEReadNumberofSupportedAdvertisingSets started")
+	}
 	if result == nil {
 		result = &LEReadNumberofSupportedAdvertisingSetsOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x003B}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -2642,70 +3422,100 @@ func (c *Commands) LEReadNumberofSupportedAdvertisingSetsSync (result *LEReadNum
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "1result": result,
+		}).Debug("LEReadNumberofSupportedAdvertisingSets completed")
+	}
 
+	 return result, err
+}
 // LERemoveAdvertisingSetInput represents the input of the command specified in Section 7.8.59
 type LERemoveAdvertisingSetInput struct {
 	AdvertisingHandle uint8
 }
 
 func (i LERemoveAdvertisingSetInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.AdvertisingHandle)
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.AdvertisingHandle))
+	return w.Data
 }
 
 // LERemoveAdvertisingSetSync executes the command specified in Section 7.8.59 synchronously
 func (c *Commands) LERemoveAdvertisingSetSync (params LERemoveAdvertisingSetInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LERemoveAdvertisingSet started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x003C}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LERemoveAdvertisingSet completed")
+	}
 
+	 return err
+}
 // LEClearAdvertisingSetsSync executes the command specified in Section 7.8.60 synchronously
 func (c *Commands) LEClearAdvertisingSetsSync () error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LEClearAdvertisingSets started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x003D}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+		}).Debug("LEClearAdvertisingSets completed")
+	}
 
+	 return err
+}
 // LESetPeriodicAdvertisingParametersInput represents the input of the command specified in Section 7.8.61
 type LESetPeriodicAdvertisingParametersInput struct {
 	AdvertisingHandle uint8
@@ -2715,37 +3525,50 @@ type LESetPeriodicAdvertisingParametersInput struct {
 }
 
 func (i LESetPeriodicAdvertisingParametersInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.AdvertisingHandle)
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.AdvertisingHandle))
 	binary.LittleEndian.PutUint16(w.Put(2), i.PeriodicAdvertisingIntervalMin)
 	binary.LittleEndian.PutUint16(w.Put(2), i.PeriodicAdvertisingIntervalMax)
 	binary.LittleEndian.PutUint16(w.Put(2), i.PeriodicAdvertisingProperties)
-	return w.Data()
+	return w.Data
 }
 
 // LESetPeriodicAdvertisingParametersSync executes the command specified in Section 7.8.61 synchronously
 func (c *Commands) LESetPeriodicAdvertisingParametersSync (params LESetPeriodicAdvertisingParametersInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetPeriodicAdvertisingParameters started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x003E}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetPeriodicAdvertisingParameters completed")
+	}
 
+	 return err
+}
 // LESetPeriodicAdvertisingDataInput represents the input of the command specified in Section 7.8.62
 type LESetPeriodicAdvertisingDataInput struct {
 	AdvertisingHandle uint8
@@ -2755,37 +3578,50 @@ type LESetPeriodicAdvertisingDataInput struct {
 }
 
 func (i LESetPeriodicAdvertisingDataInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.AdvertisingHandle)
-	w.PutOne(i.Operation)
-	w.PutOne(i.AdvertisingDataLength)
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.AdvertisingHandle))
+	w.PutOne(uint8(i.Operation))
+	w.PutOne(uint8(i.AdvertisingDataLength))
 	w.PutSlice(i.AdvertisingData)
-	return w.Data()
+	return w.Data
 }
 
 // LESetPeriodicAdvertisingDataSync executes the command specified in Section 7.8.62 synchronously
 func (c *Commands) LESetPeriodicAdvertisingDataSync (params LESetPeriodicAdvertisingDataInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetPeriodicAdvertisingData started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x003F}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetPeriodicAdvertisingData completed")
+	}
 
+	 return err
+}
 // LESetPeriodicAdvertisingEnableInput represents the input of the command specified in Section 7.8.63
 type LESetPeriodicAdvertisingEnableInput struct {
 	Enable uint8
@@ -2793,38 +3629,51 @@ type LESetPeriodicAdvertisingEnableInput struct {
 }
 
 func (i LESetPeriodicAdvertisingEnableInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.Enable)
-	w.PutOne(i.AdvertisingHandle)
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.Enable))
+	w.PutOne(uint8(i.AdvertisingHandle))
+	return w.Data
 }
 
 // LESetPeriodicAdvertisingEnableSync executes the command specified in Section 7.8.63 synchronously
 func (c *Commands) LESetPeriodicAdvertisingEnableSync (params LESetPeriodicAdvertisingEnableInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetPeriodicAdvertisingEnable started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0040}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetPeriodicAdvertisingEnable completed")
+	}
 
+	 return err
+}
 // LESetExtendedScanParametersInput represents the input of the command specified in Section 7.8.64
 type LESetExtendedScanParametersInput struct {
-	OwnAddressType uint8
+	OwnAddressType bleutil.MacAddrType
 	ScanningFilterPolicy uint8
 	ScanningPHYs uint8
 	ScanType []uint8
@@ -2833,16 +3682,16 @@ type LESetExtendedScanParametersInput struct {
 }
 
 func (i LESetExtendedScanParametersInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.OwnAddressType)
-	w.PutOne(i.ScanningFilterPolicy)
-	w.PutOne(i.ScanningPHYs)
-	var0 := countSetBits(uint64(i.ScanningPHYs))
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.OwnAddressType))
+	w.PutOne(uint8(i.ScanningFilterPolicy))
+	w.PutOne(uint8(i.ScanningPHYs))
+	var0 := bleutil.CountSetBits(uint64(i.ScanningPHYs))
 	if len(i.ScanType) != var0 {
 		panic("len(i.ScanType) != var0")
 	}
 	for _, m := range i.ScanType {
-		w.PutOne(m)
+		w.PutOne(uint8(m))
 	}
 	if len(i.ScanInterval) != var0 {
 		panic("len(i.ScanInterval) != var0")
@@ -2856,32 +3705,45 @@ func (i LESetExtendedScanParametersInput) encode(data []byte) []byte {
 	for _, m := range i.ScanWindow {
 		binary.LittleEndian.PutUint16(w.Put(2), m)
 	}
-	return w.Data()
+	return w.Data
 }
 
 // LESetExtendedScanParametersSync executes the command specified in Section 7.8.64 synchronously
 func (c *Commands) LESetExtendedScanParametersSync (params LESetExtendedScanParametersInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetExtendedScanParameters started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0041}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetExtendedScanParameters completed")
+	}
 
+	 return err
+}
 // LESetExtendedScanEnableInput represents the input of the command specified in Section 7.8.65
 type LESetExtendedScanEnableInput struct {
 	Enable uint8
@@ -2891,43 +3753,56 @@ type LESetExtendedScanEnableInput struct {
 }
 
 func (i LESetExtendedScanEnableInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.Enable)
-	w.PutOne(i.FilterDuplicates)
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.Enable))
+	w.PutOne(uint8(i.FilterDuplicates))
 	binary.LittleEndian.PutUint16(w.Put(2), i.Duration)
 	binary.LittleEndian.PutUint16(w.Put(2), i.Period)
-	return w.Data()
+	return w.Data
 }
 
 // LESetExtendedScanEnableSync executes the command specified in Section 7.8.65 synchronously
 func (c *Commands) LESetExtendedScanEnableSync (params LESetExtendedScanEnableInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetExtendedScanEnable started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0042}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetExtendedScanEnable completed")
+	}
 
+	 return err
+}
 // LEExtendedCreateConnectionInput represents the input of the command specified in Section 7.8.66
 type LEExtendedCreateConnectionInput struct {
 	InitiatingFilterPolicy uint8
-	OwnAddressType uint8
-	PeerAddressType uint8
-	PeerAddress [6]byte
+	OwnAddressType bleutil.MacAddrType
+	PeerAddressType bleutil.MacAddrType
+	PeerAddress bleutil.MacAddr
 	InitiatingPHYs uint8
 	ScanInterval []uint16
 	ScanWindow []uint16
@@ -2940,13 +3815,13 @@ type LEExtendedCreateConnectionInput struct {
 }
 
 func (i LEExtendedCreateConnectionInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.InitiatingFilterPolicy)
-	w.PutOne(i.OwnAddressType)
-	w.PutOne(i.PeerAddressType)
-	copy(w.Put(6), i.PeerAddress[:])
-	w.PutOne(i.InitiatingPHYs)
-	var1 := countSetBits(uint64(i.InitiatingPHYs))
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.InitiatingFilterPolicy))
+	w.PutOne(uint8(i.OwnAddressType))
+	w.PutOne(uint8(i.PeerAddressType))
+	i.PeerAddress.Encode(w.Put(6))
+	w.PutOne(uint8(i.InitiatingPHYs))
+	var1 := bleutil.CountSetBits(uint64(i.InitiatingPHYs))
 	if len(i.ScanInterval) != var1 {
 		panic("len(i.ScanInterval) != var1")
 	}
@@ -2995,232 +3870,319 @@ func (i LEExtendedCreateConnectionInput) encode(data []byte) []byte {
 	for _, m := range i.MaxCELength {
 		binary.LittleEndian.PutUint16(w.Put(2), m)
 	}
-	return w.Data()
+	return w.Data
 }
 
 // LEExtendedCreateConnectionSync executes the command specified in Section 7.8.66 synchronously
 func (c *Commands) LEExtendedCreateConnectionSync (params LEExtendedCreateConnectionInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEExtendedCreateConnection started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0043}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LEExtendedCreateConnection completed")
+	}
 
+	 return err
+}
 // LEPeriodicAdvertisingCreateSyncInput represents the input of the command specified in Section 7.8.67
 type LEPeriodicAdvertisingCreateSyncInput struct {
 	Options uint8
 	AdvertisingSID uint8
-	AdvertiserAddressType uint8
-	AdvertiserAddress [6]byte
+	AdvertiserAddressType bleutil.MacAddrType
+	AdvertiserAddress bleutil.MacAddr
 	Skip uint16
 	SyncTimeout uint16
 	SyncCTEType uint8
 }
 
 func (i LEPeriodicAdvertisingCreateSyncInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.Options)
-	w.PutOne(i.AdvertisingSID)
-	w.PutOne(i.AdvertiserAddressType)
-	copy(w.Put(6), i.AdvertiserAddress[:])
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.Options))
+	w.PutOne(uint8(i.AdvertisingSID))
+	w.PutOne(uint8(i.AdvertiserAddressType))
+	i.AdvertiserAddress.Encode(w.Put(6))
 	binary.LittleEndian.PutUint16(w.Put(2), i.Skip)
 	binary.LittleEndian.PutUint16(w.Put(2), i.SyncTimeout)
-	w.PutOne(i.SyncCTEType)
-	return w.Data()
+	w.PutOne(uint8(i.SyncCTEType))
+	return w.Data
 }
 
 // LEPeriodicAdvertisingCreateSyncSync executes the command specified in Section 7.8.67 synchronously
 func (c *Commands) LEPeriodicAdvertisingCreateSyncSync (params LEPeriodicAdvertisingCreateSyncInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEPeriodicAdvertisingCreateSync started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0044}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LEPeriodicAdvertisingCreateSync completed")
+	}
 
+	 return err
+}
 // LEPeriodicAdvertisingCreateSyncCancelSync executes the command specified in Section 7.8.68 synchronously
 func (c *Commands) LEPeriodicAdvertisingCreateSyncCancelSync () error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LEPeriodicAdvertisingCreateSyncCancel started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0045}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+		}).Debug("LEPeriodicAdvertisingCreateSyncCancel completed")
+	}
 
+	 return err
+}
 // LEPeriodicAdvertisingTerminateSyncInput represents the input of the command specified in Section 7.8.69
 type LEPeriodicAdvertisingTerminateSyncInput struct {
 	SyncHandle uint16
 }
 
 func (i LEPeriodicAdvertisingTerminateSyncInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.SyncHandle)
-	return w.Data()
+	return w.Data
 }
 
 // LEPeriodicAdvertisingTerminateSyncSync executes the command specified in Section 7.8.69 synchronously
 func (c *Commands) LEPeriodicAdvertisingTerminateSyncSync (params LEPeriodicAdvertisingTerminateSyncInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEPeriodicAdvertisingTerminateSync started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0046}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LEPeriodicAdvertisingTerminateSync completed")
+	}
 
+	 return err
+}
 // LEAddDeviceToPeriodicAdvertiserListInput represents the input of the command specified in Section 7.8.70
 type LEAddDeviceToPeriodicAdvertiserListInput struct {
-	AdvertiserAddressType uint8
-	AdvertiserAddress [6]byte
+	AdvertiserAddressType bleutil.MacAddrType
+	AdvertiserAddress bleutil.MacAddr
 	AdvertisingSID uint8
 }
 
 func (i LEAddDeviceToPeriodicAdvertiserListInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.AdvertiserAddressType)
-	copy(w.Put(6), i.AdvertiserAddress[:])
-	w.PutOne(i.AdvertisingSID)
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.AdvertiserAddressType))
+	i.AdvertiserAddress.Encode(w.Put(6))
+	w.PutOne(uint8(i.AdvertisingSID))
+	return w.Data
 }
 
 // LEAddDeviceToPeriodicAdvertiserListSync executes the command specified in Section 7.8.70 synchronously
 func (c *Commands) LEAddDeviceToPeriodicAdvertiserListSync (params LEAddDeviceToPeriodicAdvertiserListInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEAddDeviceToPeriodicAdvertiserList started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0047}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LEAddDeviceToPeriodicAdvertiserList completed")
+	}
 
+	 return err
+}
 // LERemoveDeviceFromPeriodicAdvertiserListInput represents the input of the command specified in Section 7.8.71
 type LERemoveDeviceFromPeriodicAdvertiserListInput struct {
-	AdvertiserAddressType uint8
-	AdvertiserAddress [6]byte
+	AdvertiserAddressType bleutil.MacAddrType
+	AdvertiserAddress bleutil.MacAddr
 	AdvertisingSID uint8
 }
 
 func (i LERemoveDeviceFromPeriodicAdvertiserListInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.AdvertiserAddressType)
-	copy(w.Put(6), i.AdvertiserAddress[:])
-	w.PutOne(i.AdvertisingSID)
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.AdvertiserAddressType))
+	i.AdvertiserAddress.Encode(w.Put(6))
+	w.PutOne(uint8(i.AdvertisingSID))
+	return w.Data
 }
 
 // LERemoveDeviceFromPeriodicAdvertiserListSync executes the command specified in Section 7.8.71 synchronously
 func (c *Commands) LERemoveDeviceFromPeriodicAdvertiserListSync (params LERemoveDeviceFromPeriodicAdvertiserListInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LERemoveDeviceFromPeriodicAdvertiserList started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0048}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LERemoveDeviceFromPeriodicAdvertiserList completed")
+	}
 
+	 return err
+}
 // LEClearPeriodicAdvertiserListSync executes the command specified in Section 7.8.72 synchronously
 func (c *Commands) LEClearPeriodicAdvertiserListSync () error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LEClearPeriodicAdvertiserList started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0049}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+		}).Debug("LEClearPeriodicAdvertiserList completed")
+	}
 
+	 return err
+}
 // LEReadPeriodicAdvertiserListSizeOutput represents the output of the command specified in Section 7.8.73
 type LEReadPeriodicAdvertiserListSizeOutput struct {
 	Status uint8
@@ -3228,26 +4190,32 @@ type LEReadPeriodicAdvertiserListSizeOutput struct {
 }
 
 func (o *LEReadPeriodicAdvertiserListSizeOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
-	o.PeriodicAdvertiserListSize = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
+	o.PeriodicAdvertiserListSize = uint8(r.GetOne())
 	return r.Valid()
 }
 
 // LEReadPeriodicAdvertiserListSizeSync executes the command specified in Section 7.8.73 synchronously
 func (c *Commands) LEReadPeriodicAdvertiserListSizeSync (result *LEReadPeriodicAdvertiserListSizeOutput) (*LEReadPeriodicAdvertiserListSizeOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LEReadPeriodicAdvertiserListSize started")
+	}
 	if result == nil {
 		result = &LEReadPeriodicAdvertiserListSizeOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x004A}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -3256,14 +4224,20 @@ func (c *Commands) LEReadPeriodicAdvertiserListSizeSync (result *LEReadPeriodicA
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "1result": result,
+		}).Debug("LEReadPeriodicAdvertiserListSize completed")
+	}
 
+	 return result, err
+}
 // LEReadTransmitPowerOutput represents the output of the command specified in Section 7.8.74
 type LEReadTransmitPowerOutput struct {
 	Status uint8
@@ -3272,27 +4246,33 @@ type LEReadTransmitPowerOutput struct {
 }
 
 func (o *LEReadTransmitPowerOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
-	o.MinTXPower = r.GetOne()
-	o.MaxTXPower = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
+	o.MinTXPower = uint8(r.GetOne())
+	o.MaxTXPower = uint8(r.GetOne())
 	return r.Valid()
 }
 
 // LEReadTransmitPowerSync executes the command specified in Section 7.8.74 synchronously
 func (c *Commands) LEReadTransmitPowerSync (result *LEReadTransmitPowerOutput) (*LEReadTransmitPowerOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LEReadTransmitPower started")
+	}
 	if result == nil {
 		result = &LEReadTransmitPowerOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x004B}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -3301,14 +4281,20 @@ func (c *Commands) LEReadTransmitPowerSync (result *LEReadTransmitPowerOutput) (
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "1result": result,
+		}).Debug("LEReadTransmitPower completed")
+	}
 
+	 return result, err
+}
 // LEReadRFPathCompensationOutput represents the output of the command specified in Section 7.8.75
 type LEReadRFPathCompensationOutput struct {
 	Status uint8
@@ -3317,8 +4303,8 @@ type LEReadRFPathCompensationOutput struct {
 }
 
 func (o *LEReadRFPathCompensationOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.RFTXPathCompensationValue = binary.LittleEndian.Uint16(r.Get(2))
 	o.RFRXPathCompensationValue = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
@@ -3326,18 +4312,24 @@ func (o *LEReadRFPathCompensationOutput) decode(data []byte) bool {
 
 // LEReadRFPathCompensationSync executes the command specified in Section 7.8.75 synchronously
 func (c *Commands) LEReadRFPathCompensationSync (result *LEReadRFPathCompensationOutput) (*LEReadRFPathCompensationOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LEReadRFPathCompensation started")
+	}
 	if result == nil {
 		result = &LEReadRFPathCompensationOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x004C}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -3346,14 +4338,20 @@ func (c *Commands) LEReadRFPathCompensationSync (result *LEReadRFPathCompensatio
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "1result": result,
+		}).Debug("LEReadRFPathCompensation completed")
+	}
 
+	 return result, err
+}
 // LEWriteRFPathCompensationInput represents the input of the command specified in Section 7.8.76
 type LEWriteRFPathCompensationInput struct {
 	RFTXPathCompensationValue uint16
@@ -3361,73 +4359,99 @@ type LEWriteRFPathCompensationInput struct {
 }
 
 func (i LEWriteRFPathCompensationInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.RFTXPathCompensationValue)
 	binary.LittleEndian.PutUint16(w.Put(2), i.RFRXPathCompensationValue)
-	return w.Data()
+	return w.Data
 }
 
 // LEWriteRFPathCompensationSync executes the command specified in Section 7.8.76 synchronously
 func (c *Commands) LEWriteRFPathCompensationSync (params LEWriteRFPathCompensationInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEWriteRFPathCompensation started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x004D}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LEWriteRFPathCompensation completed")
+	}
 
+	 return err
+}
 // LESetPrivacyModeInput represents the input of the command specified in Section 7.8.77
 type LESetPrivacyModeInput struct {
-	PeerIdentityAddressType uint8
-	PeerIdentityAddress [6]byte
+	PeerIdentityAddressType bleutil.MacAddrType
+	PeerIdentityAddress bleutil.MacAddr
 	PrivacyMode uint8
 }
 
 func (i LESetPrivacyModeInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.PeerIdentityAddressType)
-	copy(w.Put(6), i.PeerIdentityAddress[:])
-	w.PutOne(i.PrivacyMode)
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.PeerIdentityAddressType))
+	i.PeerIdentityAddress.Encode(w.Put(6))
+	w.PutOne(uint8(i.PrivacyMode))
+	return w.Data
 }
 
 // LESetPrivacyModeSync executes the command specified in Section 7.8.77 synchronously
 func (c *Commands) LESetPrivacyModeSync (params LESetPrivacyModeInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetPrivacyMode started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x004E}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetPrivacyMode completed")
+	}
 
+	 return err
+}
 // LESetConnectionlessCTETransmitParametersInput represents the input of the command specified in Section 7.8.80
 type LESetConnectionlessCTETransmitParametersInput struct {
 	AdvertisingHandle uint8
@@ -3439,44 +4463,57 @@ type LESetConnectionlessCTETransmitParametersInput struct {
 }
 
 func (i LESetConnectionlessCTETransmitParametersInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.AdvertisingHandle)
-	w.PutOne(i.CTELength)
-	w.PutOne(i.CTEType)
-	w.PutOne(i.CTECount)
-	w.PutOne(i.SwitchingPatternLength)
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.AdvertisingHandle))
+	w.PutOne(uint8(i.CTELength))
+	w.PutOne(uint8(i.CTEType))
+	w.PutOne(uint8(i.CTECount))
+	w.PutOne(uint8(i.SwitchingPatternLength))
 	if len(i.AntennaIDs) != int(i.SwitchingPatternLength) {
 		panic("len(i.AntennaIDs) != int(i.SwitchingPatternLength)")
 	}
 	for _, m := range i.AntennaIDs {
-		w.PutOne(m)
+		w.PutOne(uint8(m))
 	}
-	return w.Data()
+	return w.Data
 }
 
 // LESetConnectionlessCTETransmitParametersSync executes the command specified in Section 7.8.80 synchronously
 func (c *Commands) LESetConnectionlessCTETransmitParametersSync (params LESetConnectionlessCTETransmitParametersInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetConnectionlessCTETransmitParameters started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0051}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetConnectionlessCTETransmitParameters completed")
+	}
 
+	 return err
+}
 // LESetConnectionlessCTETransmitEnableInput represents the input of the command specified in Section 7.8.81
 type LESetConnectionlessCTETransmitEnableInput struct {
 	AdvertisingHandle uint8
@@ -3484,35 +4521,48 @@ type LESetConnectionlessCTETransmitEnableInput struct {
 }
 
 func (i LESetConnectionlessCTETransmitEnableInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.AdvertisingHandle)
-	w.PutOne(i.CTEEnable)
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.AdvertisingHandle))
+	w.PutOne(uint8(i.CTEEnable))
+	return w.Data
 }
 
 // LESetConnectionlessCTETransmitEnableSync executes the command specified in Section 7.8.81 synchronously
 func (c *Commands) LESetConnectionlessCTETransmitEnableSync (params LESetConnectionlessCTETransmitEnableInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetConnectionlessCTETransmitEnable started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0052}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetConnectionlessCTETransmitEnable completed")
+	}
 
+	 return err
+}
 // LESetConnectionlessIQSamplingEnableInput represents the input of the command specified in Section 7.8.82
 type LESetConnectionlessIQSamplingEnableInput struct {
 	SyncHandle uint16
@@ -3524,19 +4574,19 @@ type LESetConnectionlessIQSamplingEnableInput struct {
 }
 
 func (i LESetConnectionlessIQSamplingEnableInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.SyncHandle)
-	w.PutOne(i.SamplingEnable)
-	w.PutOne(i.SlotDurations)
-	w.PutOne(i.MaxSampledCTEs)
-	w.PutOne(i.SwitchingPatternLength)
+	w.PutOne(uint8(i.SamplingEnable))
+	w.PutOne(uint8(i.SlotDurations))
+	w.PutOne(uint8(i.MaxSampledCTEs))
+	w.PutOne(uint8(i.SwitchingPatternLength))
 	if len(i.AntennaIDs) != int(i.SwitchingPatternLength) {
 		panic("len(i.AntennaIDs) != int(i.SwitchingPatternLength)")
 	}
 	for _, m := range i.AntennaIDs {
-		w.PutOne(m)
+		w.PutOne(uint8(m))
 	}
-	return w.Data()
+	return w.Data
 }
 
 // LESetConnectionlessIQSamplingEnableOutput represents the output of the command specified in Section 7.8.82
@@ -3546,27 +4596,34 @@ type LESetConnectionlessIQSamplingEnableOutput struct {
 }
 
 func (o *LESetConnectionlessIQSamplingEnableOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.SyncHandle = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
 }
 
 // LESetConnectionlessIQSamplingEnableSync executes the command specified in Section 7.8.82 synchronously
 func (c *Commands) LESetConnectionlessIQSamplingEnableSync (params LESetConnectionlessIQSamplingEnableInput, result *LESetConnectionlessIQSamplingEnableOutput) (*LESetConnectionlessIQSamplingEnableOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetConnectionlessIQSamplingEnable started")
+	}
 	if result == nil {
 		result = &LESetConnectionlessIQSamplingEnableOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0053}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -3575,14 +4632,21 @@ func (c *Commands) LESetConnectionlessIQSamplingEnableSync (params LESetConnecti
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LESetConnectionlessIQSamplingEnable completed")
+	}
 
+	 return result, err
+}
 // LESetConnectionCTEReceiveParametersInput represents the input of the command specified in Section 7.8.83
 type LESetConnectionCTEReceiveParametersInput struct {
 	ConnectionHandle uint16
@@ -3593,18 +4657,18 @@ type LESetConnectionCTEReceiveParametersInput struct {
 }
 
 func (i LESetConnectionCTEReceiveParametersInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	w.PutOne(i.SamplingEnable)
-	w.PutOne(i.SlotDurations)
-	w.PutOne(i.SwitchingPatternLength)
+	w.PutOne(uint8(i.SamplingEnable))
+	w.PutOne(uint8(i.SlotDurations))
+	w.PutOne(uint8(i.SwitchingPatternLength))
 	if len(i.AntennaIDs) != int(i.SwitchingPatternLength) {
 		panic("len(i.AntennaIDs) != int(i.SwitchingPatternLength)")
 	}
 	for _, m := range i.AntennaIDs {
-		w.PutOne(m)
+		w.PutOne(uint8(m))
 	}
-	return w.Data()
+	return w.Data
 }
 
 // LESetConnectionCTEReceiveParametersOutput represents the output of the command specified in Section 7.8.83
@@ -3614,27 +4678,34 @@ type LESetConnectionCTEReceiveParametersOutput struct {
 }
 
 func (o *LESetConnectionCTEReceiveParametersOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
 }
 
 // LESetConnectionCTEReceiveParametersSync executes the command specified in Section 7.8.83 synchronously
 func (c *Commands) LESetConnectionCTEReceiveParametersSync (params LESetConnectionCTEReceiveParametersInput, result *LESetConnectionCTEReceiveParametersOutput) (*LESetConnectionCTEReceiveParametersOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetConnectionCTEReceiveParameters started")
+	}
 	if result == nil {
 		result = &LESetConnectionCTEReceiveParametersOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0054}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -3643,14 +4714,21 @@ func (c *Commands) LESetConnectionCTEReceiveParametersSync (params LESetConnecti
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LESetConnectionCTEReceiveParameters completed")
+	}
 
+	 return result, err
+}
 // LESetConnectionCTETransmitParametersInput represents the input of the command specified in Section 7.8.84
 type LESetConnectionCTETransmitParametersInput struct {
 	ConnectionHandle uint16
@@ -3660,17 +4738,17 @@ type LESetConnectionCTETransmitParametersInput struct {
 }
 
 func (i LESetConnectionCTETransmitParametersInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	w.PutOne(i.CTETypes)
-	w.PutOne(i.SwitchingPatternLength)
+	w.PutOne(uint8(i.CTETypes))
+	w.PutOne(uint8(i.SwitchingPatternLength))
 	if len(i.AntennaIDs) != int(i.SwitchingPatternLength) {
 		panic("len(i.AntennaIDs) != int(i.SwitchingPatternLength)")
 	}
 	for _, m := range i.AntennaIDs {
-		w.PutOne(m)
+		w.PutOne(uint8(m))
 	}
-	return w.Data()
+	return w.Data
 }
 
 // LESetConnectionCTETransmitParametersOutput represents the output of the command specified in Section 7.8.84
@@ -3680,27 +4758,34 @@ type LESetConnectionCTETransmitParametersOutput struct {
 }
 
 func (o *LESetConnectionCTETransmitParametersOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
 }
 
 // LESetConnectionCTETransmitParametersSync executes the command specified in Section 7.8.84 synchronously
 func (c *Commands) LESetConnectionCTETransmitParametersSync (params LESetConnectionCTETransmitParametersInput, result *LESetConnectionCTETransmitParametersOutput) (*LESetConnectionCTETransmitParametersOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetConnectionCTETransmitParameters started")
+	}
 	if result == nil {
 		result = &LESetConnectionCTETransmitParametersOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0055}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -3709,14 +4794,21 @@ func (c *Commands) LESetConnectionCTETransmitParametersSync (params LESetConnect
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LESetConnectionCTETransmitParameters completed")
+	}
 
+	 return result, err
+}
 // LEConnectionCTERequestEnableInput represents the input of the command specified in Section 7.8.85
 type LEConnectionCTERequestEnableInput struct {
 	ConnectionHandle uint16
@@ -3727,13 +4819,13 @@ type LEConnectionCTERequestEnableInput struct {
 }
 
 func (i LEConnectionCTERequestEnableInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	w.PutOne(i.Enable)
+	w.PutOne(uint8(i.Enable))
 	binary.LittleEndian.PutUint16(w.Put(2), i.CTERequestInterval)
-	w.PutOne(i.RequestedCTELength)
-	w.PutOne(i.RequestedCTEType)
-	return w.Data()
+	w.PutOne(uint8(i.RequestedCTELength))
+	w.PutOne(uint8(i.RequestedCTEType))
+	return w.Data
 }
 
 // LEConnectionCTERequestEnableOutput represents the output of the command specified in Section 7.8.85
@@ -3743,27 +4835,34 @@ type LEConnectionCTERequestEnableOutput struct {
 }
 
 func (o *LEConnectionCTERequestEnableOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
 }
 
 // LEConnectionCTERequestEnableSync executes the command specified in Section 7.8.85 synchronously
 func (c *Commands) LEConnectionCTERequestEnableSync (params LEConnectionCTERequestEnableInput, result *LEConnectionCTERequestEnableOutput) (*LEConnectionCTERequestEnableOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEConnectionCTERequestEnable started")
+	}
 	if result == nil {
 		result = &LEConnectionCTERequestEnableOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0056}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -3772,14 +4871,21 @@ func (c *Commands) LEConnectionCTERequestEnableSync (params LEConnectionCTEReque
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LEConnectionCTERequestEnable completed")
+	}
 
+	 return result, err
+}
 // LEConnectionCTEResponseEnableInput represents the input of the command specified in Section 7.8.86
 type LEConnectionCTEResponseEnableInput struct {
 	ConnectionHandle uint16
@@ -3787,10 +4893,10 @@ type LEConnectionCTEResponseEnableInput struct {
 }
 
 func (i LEConnectionCTEResponseEnableInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	w.PutOne(i.Enable)
-	return w.Data()
+	w.PutOne(uint8(i.Enable))
+	return w.Data
 }
 
 // LEConnectionCTEResponseEnableOutput represents the output of the command specified in Section 7.8.86
@@ -3800,27 +4906,34 @@ type LEConnectionCTEResponseEnableOutput struct {
 }
 
 func (o *LEConnectionCTEResponseEnableOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
 }
 
 // LEConnectionCTEResponseEnableSync executes the command specified in Section 7.8.86 synchronously
 func (c *Commands) LEConnectionCTEResponseEnableSync (params LEConnectionCTEResponseEnableInput, result *LEConnectionCTEResponseEnableOutput) (*LEConnectionCTEResponseEnableOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEConnectionCTEResponseEnable started")
+	}
 	if result == nil {
 		result = &LEConnectionCTEResponseEnableOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0057}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -3829,14 +4942,21 @@ func (c *Commands) LEConnectionCTEResponseEnableSync (params LEConnectionCTEResp
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LEConnectionCTEResponseEnable completed")
+	}
 
+	 return result, err
+}
 // LEReadAntennaInformationOutput represents the output of the command specified in Section 7.8.87
 type LEReadAntennaInformationOutput struct {
 	Status uint8
@@ -3847,29 +4967,35 @@ type LEReadAntennaInformationOutput struct {
 }
 
 func (o *LEReadAntennaInformationOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
-	o.SupportedSwitchingSamplingRates = r.GetOne()
-	o.NumAntennae = r.GetOne()
-	o.MaxSwitchingPatternLength = r.GetOne()
-	o.MaxCTELength = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
+	o.SupportedSwitchingSamplingRates = uint8(r.GetOne())
+	o.NumAntennae = uint8(r.GetOne())
+	o.MaxSwitchingPatternLength = uint8(r.GetOne())
+	o.MaxCTELength = uint8(r.GetOne())
 	return r.Valid()
 }
 
 // LEReadAntennaInformationSync executes the command specified in Section 7.8.87 synchronously
 func (c *Commands) LEReadAntennaInformationSync (result *LEReadAntennaInformationOutput) (*LEReadAntennaInformationOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("LEReadAntennaInformation started")
+	}
 	if result == nil {
 		result = &LEReadAntennaInformationOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0058}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -3878,14 +5004,20 @@ func (c *Commands) LEReadAntennaInformationSync (result *LEReadAntennaInformatio
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "1result": result,
+		}).Debug("LEReadAntennaInformation completed")
+	}
 
+	 return result, err
+}
 // LESetPeriodicAdvertisingReceiveEnableInput represents the input of the command specified in Section 7.8.88
 type LESetPeriodicAdvertisingReceiveEnableInput struct {
 	SyncHandle uint16
@@ -3893,35 +5025,48 @@ type LESetPeriodicAdvertisingReceiveEnableInput struct {
 }
 
 func (i LESetPeriodicAdvertisingReceiveEnableInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.SyncHandle)
-	w.PutOne(i.Enable)
-	return w.Data()
+	w.PutOne(uint8(i.Enable))
+	return w.Data
 }
 
 // LESetPeriodicAdvertisingReceiveEnableSync executes the command specified in Section 7.8.88 synchronously
 func (c *Commands) LESetPeriodicAdvertisingReceiveEnableSync (params LESetPeriodicAdvertisingReceiveEnableInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetPeriodicAdvertisingReceiveEnable started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0059}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetPeriodicAdvertisingReceiveEnable completed")
+	}
 
+	 return err
+}
 // LEPeriodicAdvertisingSyncTransferInput represents the input of the command specified in Section 7.8.89
 type LEPeriodicAdvertisingSyncTransferInput struct {
 	ConnectionHandle uint16
@@ -3930,11 +5075,11 @@ type LEPeriodicAdvertisingSyncTransferInput struct {
 }
 
 func (i LEPeriodicAdvertisingSyncTransferInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
 	binary.LittleEndian.PutUint16(w.Put(2), i.ServiceData)
 	binary.LittleEndian.PutUint16(w.Put(2), i.SyncHandle)
-	return w.Data()
+	return w.Data
 }
 
 // LEPeriodicAdvertisingSyncTransferOutput represents the output of the command specified in Section 7.8.89
@@ -3944,27 +5089,34 @@ type LEPeriodicAdvertisingSyncTransferOutput struct {
 }
 
 func (o *LEPeriodicAdvertisingSyncTransferOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
 }
 
 // LEPeriodicAdvertisingSyncTransferSync executes the command specified in Section 7.8.89 synchronously
 func (c *Commands) LEPeriodicAdvertisingSyncTransferSync (params LEPeriodicAdvertisingSyncTransferInput, result *LEPeriodicAdvertisingSyncTransferOutput) (*LEPeriodicAdvertisingSyncTransferOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEPeriodicAdvertisingSyncTransfer started")
+	}
 	if result == nil {
 		result = &LEPeriodicAdvertisingSyncTransferOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x005A}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -3973,14 +5125,21 @@ func (c *Commands) LEPeriodicAdvertisingSyncTransferSync (params LEPeriodicAdver
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LEPeriodicAdvertisingSyncTransfer completed")
+	}
 
+	 return result, err
+}
 // LEPeriodicAdvertisingSetInfoTransferInput represents the input of the command specified in Section 7.8.90
 type LEPeriodicAdvertisingSetInfoTransferInput struct {
 	ConnectionHandle uint16
@@ -3989,11 +5148,11 @@ type LEPeriodicAdvertisingSetInfoTransferInput struct {
 }
 
 func (i LEPeriodicAdvertisingSetInfoTransferInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
 	binary.LittleEndian.PutUint16(w.Put(2), i.ServiceData)
-	w.PutOne(i.AdvertisingHandle)
-	return w.Data()
+	w.PutOne(uint8(i.AdvertisingHandle))
+	return w.Data
 }
 
 // LEPeriodicAdvertisingSetInfoTransferOutput represents the output of the command specified in Section 7.8.90
@@ -4003,27 +5162,34 @@ type LEPeriodicAdvertisingSetInfoTransferOutput struct {
 }
 
 func (o *LEPeriodicAdvertisingSetInfoTransferOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
 }
 
 // LEPeriodicAdvertisingSetInfoTransferSync executes the command specified in Section 7.8.90 synchronously
 func (c *Commands) LEPeriodicAdvertisingSetInfoTransferSync (params LEPeriodicAdvertisingSetInfoTransferInput, result *LEPeriodicAdvertisingSetInfoTransferOutput) (*LEPeriodicAdvertisingSetInfoTransferOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEPeriodicAdvertisingSetInfoTransfer started")
+	}
 	if result == nil {
 		result = &LEPeriodicAdvertisingSetInfoTransferOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x005B}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -4032,14 +5198,21 @@ func (c *Commands) LEPeriodicAdvertisingSetInfoTransferSync (params LEPeriodicAd
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LEPeriodicAdvertisingSetInfoTransfer completed")
+	}
 
+	 return result, err
+}
 // LESetPeriodicAdvertisingSyncTransferParametersInput represents the input of the command specified in Section 7.8.91
 type LESetPeriodicAdvertisingSyncTransferParametersInput struct {
 	ConnectionHandle uint16
@@ -4050,13 +5223,13 @@ type LESetPeriodicAdvertisingSyncTransferParametersInput struct {
 }
 
 func (i LESetPeriodicAdvertisingSyncTransferParametersInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	w.PutOne(i.Mode)
+	w.PutOne(uint8(i.Mode))
 	binary.LittleEndian.PutUint16(w.Put(2), i.Skip)
 	binary.LittleEndian.PutUint16(w.Put(2), i.SyncTimeout)
-	w.PutOne(i.CTEType)
-	return w.Data()
+	w.PutOne(uint8(i.CTEType))
+	return w.Data
 }
 
 // LESetPeriodicAdvertisingSyncTransferParametersOutput represents the output of the command specified in Section 7.8.91
@@ -4066,27 +5239,34 @@ type LESetPeriodicAdvertisingSyncTransferParametersOutput struct {
 }
 
 func (o *LESetPeriodicAdvertisingSyncTransferParametersOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
 }
 
 // LESetPeriodicAdvertisingSyncTransferParametersSync executes the command specified in Section 7.8.91 synchronously
 func (c *Commands) LESetPeriodicAdvertisingSyncTransferParametersSync (params LESetPeriodicAdvertisingSyncTransferParametersInput, result *LESetPeriodicAdvertisingSyncTransferParametersOutput) (*LESetPeriodicAdvertisingSyncTransferParametersOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetPeriodicAdvertisingSyncTransferParameters started")
+	}
 	if result == nil {
 		result = &LESetPeriodicAdvertisingSyncTransferParametersOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x005C}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -4095,57 +5275,77 @@ func (c *Commands) LESetPeriodicAdvertisingSyncTransferParametersSync (params LE
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LESetPeriodicAdvertisingSyncTransferParameters completed")
+	}
 
+	 return result, err
+}
 // LEModifySleepClockAccuracyInput represents the input of the command specified in Section 7.8.94
 type LEModifySleepClockAccuracyInput struct {
 	Action uint8
 }
 
 func (i LEModifySleepClockAccuracyInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.Action)
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.Action))
+	return w.Data
 }
 
 // LEModifySleepClockAccuracySync executes the command specified in Section 7.8.94 synchronously
 func (c *Commands) LEModifySleepClockAccuracySync (params LEModifySleepClockAccuracyInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEModifySleepClockAccuracy started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x005F}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LEModifySleepClockAccuracy completed")
+	}
 
+	 return err
+}
 // LEReadISOTXSyncInput represents the input of the command specified in Section 7.8.96
 type LEReadISOTXSyncInput struct {
 	ConnectionHandle uint16
 }
 
 func (i LEReadISOTXSyncInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	return w.Data()
+	return w.Data
 }
 
 // LEReadISOTXSyncOutput represents the output of the command specified in Section 7.8.96
@@ -4158,30 +5358,37 @@ type LEReadISOTXSyncOutput struct {
 }
 
 func (o *LEReadISOTXSyncOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	o.PacketSequenceNumber = binary.LittleEndian.Uint16(r.Get(2))
 	o.TimeStamp = binary.LittleEndian.Uint32(r.Get(4))
-	o.TimeOffset = decodeUint24(r.Get(3))
+	o.TimeOffset = bleutil.DecodeUint24(r.Get(3))
 	return r.Valid()
 }
 
 // LEReadISOTXSyncSync executes the command specified in Section 7.8.96 synchronously
 func (c *Commands) LEReadISOTXSyncSync (params LEReadISOTXSyncInput, result *LEReadISOTXSyncOutput) (*LEReadISOTXSyncOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEReadISOTXSync started")
+	}
 	if result == nil {
 		result = &LEReadISOTXSyncOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0061}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -4190,14 +5397,21 @@ func (c *Commands) LEReadISOTXSyncSync (params LEReadISOTXSyncInput, result *LER
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LEReadISOTXSync completed")
+	}
 
+	 return result, err
+}
 // LESetCIGParametersInput represents the input of the command specified in Section 7.8.97
 type LESetCIGParametersInput struct {
 	CIGID uint8
@@ -4219,21 +5433,21 @@ type LESetCIGParametersInput struct {
 }
 
 func (i LESetCIGParametersInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.CIGID)
-	encodeUint24(w.Put(3), i.SDUIntervalMToS)
-	encodeUint24(w.Put(3), i.SDUIntervalSToM)
-	w.PutOne(i.SlavesClockAccuracy)
-	w.PutOne(i.Packing)
-	w.PutOne(i.Framing)
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.CIGID))
+	bleutil.EncodeUint24(w.Put(3), i.SDUIntervalMToS)
+	bleutil.EncodeUint24(w.Put(3), i.SDUIntervalSToM)
+	w.PutOne(uint8(i.SlavesClockAccuracy))
+	w.PutOne(uint8(i.Packing))
+	w.PutOne(uint8(i.Framing))
 	binary.LittleEndian.PutUint16(w.Put(2), i.MaxTransportLatencyMToS)
 	binary.LittleEndian.PutUint16(w.Put(2), i.MaxTransportLatencySToM)
-	w.PutOne(i.CISCount)
+	w.PutOne(uint8(i.CISCount))
 	if len(i.CISID) != int(i.CISCount) {
 		panic("len(i.CISID) != int(i.CISCount)")
 	}
 	for _, m := range i.CISID {
-		w.PutOne(m)
+		w.PutOne(uint8(m))
 	}
 	if len(i.MaxSDUMToS) != int(i.CISCount) {
 		panic("len(i.MaxSDUMToS) != int(i.CISCount)")
@@ -4251,27 +5465,27 @@ func (i LESetCIGParametersInput) encode(data []byte) []byte {
 		panic("len(i.PHYMToS) != int(i.CISCount)")
 	}
 	for _, m := range i.PHYMToS {
-		w.PutOne(m)
+		w.PutOne(uint8(m))
 	}
 	if len(i.PHYSToM) != int(i.CISCount) {
 		panic("len(i.PHYSToM) != int(i.CISCount)")
 	}
 	for _, m := range i.PHYSToM {
-		w.PutOne(m)
+		w.PutOne(uint8(m))
 	}
 	if len(i.RTNMToS) != int(i.CISCount) {
 		panic("len(i.RTNMToS) != int(i.CISCount)")
 	}
 	for _, m := range i.RTNMToS {
-		w.PutOne(m)
+		w.PutOne(uint8(m))
 	}
 	if len(i.RTNSToM) != int(i.CISCount) {
 		panic("len(i.RTNSToM) != int(i.CISCount)")
 	}
 	for _, m := range i.RTNSToM {
-		w.PutOne(m)
+		w.PutOne(uint8(m))
 	}
-	return w.Data()
+	return w.Data
 }
 
 // LESetCIGParametersOutput represents the output of the command specified in Section 7.8.97
@@ -4283,10 +5497,10 @@ type LESetCIGParametersOutput struct {
 }
 
 func (o *LESetCIGParametersOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
-	o.CIGID = r.GetOne()
-	o.CISCount = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
+	o.CIGID = uint8(r.GetOne())
+	o.CISCount = uint8(r.GetOne())
 	if cap(o.ConnectionHandle) < int(o.CISCount) {
 		o.ConnectionHandle = make([]uint16, 0, int(o.CISCount))
 	}
@@ -4299,19 +5513,26 @@ func (o *LESetCIGParametersOutput) decode(data []byte) bool {
 
 // LESetCIGParametersSync executes the command specified in Section 7.8.97 synchronously
 func (c *Commands) LESetCIGParametersSync (params LESetCIGParametersInput, result *LESetCIGParametersOutput) (*LESetCIGParametersOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetCIGParameters started")
+	}
 	if result == nil {
 		result = &LESetCIGParametersOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0062}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -4320,14 +5541,21 @@ func (c *Commands) LESetCIGParametersSync (params LESetCIGParametersInput, resul
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LESetCIGParameters completed")
+	}
 
+	 return result, err
+}
 // LESetCIGParametersTestInput represents the input of the command specified in Section 7.8.98
 type LESetCIGParametersTestInput struct {
 	CIGID uint8
@@ -4353,28 +5581,28 @@ type LESetCIGParametersTestInput struct {
 }
 
 func (i LESetCIGParametersTestInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.CIGID)
-	encodeUint24(w.Put(3), i.SDUIntervalMToS)
-	encodeUint24(w.Put(3), i.SDUIntervalSToM)
-	w.PutOne(i.FTMToS)
-	w.PutOne(i.FTSToM)
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.CIGID))
+	bleutil.EncodeUint24(w.Put(3), i.SDUIntervalMToS)
+	bleutil.EncodeUint24(w.Put(3), i.SDUIntervalSToM)
+	w.PutOne(uint8(i.FTMToS))
+	w.PutOne(uint8(i.FTSToM))
 	binary.LittleEndian.PutUint16(w.Put(2), i.ISOInterval)
-	w.PutOne(i.SlavesClockAccuracy)
-	w.PutOne(i.Packing)
-	w.PutOne(i.Framing)
-	w.PutOne(i.CISCount)
+	w.PutOne(uint8(i.SlavesClockAccuracy))
+	w.PutOne(uint8(i.Packing))
+	w.PutOne(uint8(i.Framing))
+	w.PutOne(uint8(i.CISCount))
 	if len(i.CISID) != int(i.CISCount) {
 		panic("len(i.CISID) != int(i.CISCount)")
 	}
 	for _, m := range i.CISID {
-		w.PutOne(m)
+		w.PutOne(uint8(m))
 	}
 	if len(i.NSE) != int(i.CISCount) {
 		panic("len(i.NSE) != int(i.CISCount)")
 	}
 	for _, m := range i.NSE {
-		w.PutOne(m)
+		w.PutOne(uint8(m))
 	}
 	if len(i.MaxSDUMToS) != int(i.CISCount) {
 		panic("len(i.MaxSDUMToS) != int(i.CISCount)")
@@ -4404,27 +5632,27 @@ func (i LESetCIGParametersTestInput) encode(data []byte) []byte {
 		panic("len(i.PHYMToS) != int(i.CISCount)")
 	}
 	for _, m := range i.PHYMToS {
-		w.PutOne(m)
+		w.PutOne(uint8(m))
 	}
 	if len(i.PHYSToM) != int(i.CISCount) {
 		panic("len(i.PHYSToM) != int(i.CISCount)")
 	}
 	for _, m := range i.PHYSToM {
-		w.PutOne(m)
+		w.PutOne(uint8(m))
 	}
 	if len(i.BNMToS) != int(i.CISCount) {
 		panic("len(i.BNMToS) != int(i.CISCount)")
 	}
 	for _, m := range i.BNMToS {
-		w.PutOne(m)
+		w.PutOne(uint8(m))
 	}
 	if len(i.BNSToM) != int(i.CISCount) {
 		panic("len(i.BNSToM) != int(i.CISCount)")
 	}
 	for _, m := range i.BNSToM {
-		w.PutOne(m)
+		w.PutOne(uint8(m))
 	}
-	return w.Data()
+	return w.Data
 }
 
 // LESetCIGParametersTestOutput represents the output of the command specified in Section 7.8.98
@@ -4436,10 +5664,10 @@ type LESetCIGParametersTestOutput struct {
 }
 
 func (o *LESetCIGParametersTestOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
-	o.CIGID = r.GetOne()
-	o.CISCount = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
+	o.CIGID = uint8(r.GetOne())
+	o.CISCount = uint8(r.GetOne())
 	if cap(o.ConnectionHandle) < int(o.CISCount) {
 		o.ConnectionHandle = make([]uint16, 0, int(o.CISCount))
 	}
@@ -4452,19 +5680,26 @@ func (o *LESetCIGParametersTestOutput) decode(data []byte) bool {
 
 // LESetCIGParametersTestSync executes the command specified in Section 7.8.98 synchronously
 func (c *Commands) LESetCIGParametersTestSync (params LESetCIGParametersTestInput, result *LESetCIGParametersTestOutput) (*LESetCIGParametersTestOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetCIGParametersTest started")
+	}
 	if result == nil {
 		result = &LESetCIGParametersTestOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0063}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -4473,14 +5708,21 @@ func (c *Commands) LESetCIGParametersTestSync (params LESetCIGParametersTestInpu
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LESetCIGParametersTest completed")
+	}
 
+	 return result, err
+}
 // LECreateCISInput represents the input of the command specified in Section 7.8.99
 type LECreateCISInput struct {
 	CISCount uint8
@@ -4489,8 +5731,8 @@ type LECreateCISInput struct {
 }
 
 func (i LECreateCISInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.CISCount)
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.CISCount))
 	if len(i.CISConnectionHandle) != int(i.CISCount) {
 		panic("len(i.CISConnectionHandle) != int(i.CISCount)")
 	}
@@ -4503,41 +5745,54 @@ func (i LECreateCISInput) encode(data []byte) []byte {
 	for _, m := range i.ACLConnectionHandle {
 		binary.LittleEndian.PutUint16(w.Put(2), m)
 	}
-	return w.Data()
+	return w.Data
 }
 
 // LECreateCISSync executes the command specified in Section 7.8.99 synchronously
 func (c *Commands) LECreateCISSync (params LECreateCISInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LECreateCIS started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0064}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LECreateCIS completed")
+	}
 
+	 return err
+}
 // LERemoveCIGInput represents the input of the command specified in Section 7.8.100
 type LERemoveCIGInput struct {
 	CIGID uint8
 }
 
 func (i LERemoveCIGInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.CIGID)
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.CIGID))
+	return w.Data
 }
 
 // LERemoveCIGOutput represents the output of the command specified in Section 7.8.100
@@ -4547,27 +5802,34 @@ type LERemoveCIGOutput struct {
 }
 
 func (o *LERemoveCIGOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
-	o.CIGID = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
+	o.CIGID = uint8(r.GetOne())
 	return r.Valid()
 }
 
 // LERemoveCIGSync executes the command specified in Section 7.8.100 synchronously
 func (c *Commands) LERemoveCIGSync (params LERemoveCIGInput, result *LERemoveCIGOutput) (*LERemoveCIGOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LERemoveCIG started")
+	}
 	if result == nil {
 		result = &LERemoveCIGOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0065}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -4576,14 +5838,21 @@ func (c *Commands) LERemoveCIGSync (params LERemoveCIGInput, result *LERemoveCIG
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LERemoveCIG completed")
+	}
 
+	 return result, err
+}
 // LEAcceptCISRequestInput represents the input of the command specified in Section 7.8.101
 type LEAcceptCISRequestInput struct {
 	BIGHandle uint8
@@ -4601,45 +5870,58 @@ type LEAcceptCISRequestInput struct {
 }
 
 func (i LEAcceptCISRequestInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.BIGHandle)
-	w.PutOne(i.AdvertisingHandle)
-	w.PutOne(i.NumBIS)
-	encodeUint24(w.Put(3), i.SDUInterval)
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.BIGHandle))
+	w.PutOne(uint8(i.AdvertisingHandle))
+	w.PutOne(uint8(i.NumBIS))
+	bleutil.EncodeUint24(w.Put(3), i.SDUInterval)
 	binary.LittleEndian.PutUint16(w.Put(2), i.MaxSDU)
 	binary.LittleEndian.PutUint16(w.Put(2), i.MaxTransportLatency)
-	w.PutOne(i.RTN)
-	w.PutOne(i.PHY)
-	w.PutOne(i.Packing)
-	w.PutOne(i.Framing)
-	w.PutOne(i.Encryption)
+	w.PutOne(uint8(i.RTN))
+	w.PutOne(uint8(i.PHY))
+	w.PutOne(uint8(i.Packing))
+	w.PutOne(uint8(i.Framing))
+	w.PutOne(uint8(i.Encryption))
 	copy(w.Put(16), i.BroadcastCode[:])
-	return w.Data()
+	return w.Data
 }
 
 // LEAcceptCISRequestSync executes the command specified in Section 7.8.101 synchronously
 func (c *Commands) LEAcceptCISRequestSync (params LEAcceptCISRequestInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEAcceptCISRequest started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0066}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LEAcceptCISRequest completed")
+	}
 
+	 return err
+}
 // LECreateBIGTestInput represents the input of the command specified in Section 7.8.104
 type LECreateBIGTestInput struct {
 	BIGHandle uint8
@@ -4661,49 +5943,62 @@ type LECreateBIGTestInput struct {
 }
 
 func (i LECreateBIGTestInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.BIGHandle)
-	w.PutOne(i.AdvertisingHandle)
-	w.PutOne(i.NumBIS)
-	encodeUint24(w.Put(3), i.SDUInterval)
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.BIGHandle))
+	w.PutOne(uint8(i.AdvertisingHandle))
+	w.PutOne(uint8(i.NumBIS))
+	bleutil.EncodeUint24(w.Put(3), i.SDUInterval)
 	binary.LittleEndian.PutUint16(w.Put(2), i.ISOInterval)
-	w.PutOne(i.NSE)
+	w.PutOne(uint8(i.NSE))
 	binary.LittleEndian.PutUint16(w.Put(2), i.MaxSDU)
 	binary.LittleEndian.PutUint16(w.Put(2), i.MaxPDU)
-	w.PutOne(i.PHY)
-	w.PutOne(i.Packing)
-	w.PutOne(i.Framing)
-	w.PutOne(i.BN)
-	w.PutOne(i.IRC)
-	w.PutOne(i.PTO)
-	w.PutOne(i.Encryption)
+	w.PutOne(uint8(i.PHY))
+	w.PutOne(uint8(i.Packing))
+	w.PutOne(uint8(i.Framing))
+	w.PutOne(uint8(i.BN))
+	w.PutOne(uint8(i.IRC))
+	w.PutOne(uint8(i.PTO))
+	w.PutOne(uint8(i.Encryption))
 	copy(w.Put(16), i.BroadcastCode[:])
-	return w.Data()
+	return w.Data
 }
 
 // LECreateBIGTestSync executes the command specified in Section 7.8.104 synchronously
 func (c *Commands) LECreateBIGTestSync (params LECreateBIGTestInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LECreateBIGTest started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0069}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LECreateBIGTest completed")
+	}
 
+	 return err
+}
 // LETerminateBIGInput represents the input of the command specified in Section 7.8.105
 type LETerminateBIGInput struct {
 	BIGHandle uint8
@@ -4711,35 +6006,48 @@ type LETerminateBIGInput struct {
 }
 
 func (i LETerminateBIGInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.BIGHandle)
-	w.PutOne(i.Reason)
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.BIGHandle))
+	w.PutOne(uint8(i.Reason))
+	return w.Data
 }
 
 // LETerminateBIGSync executes the command specified in Section 7.8.105 synchronously
 func (c *Commands) LETerminateBIGSync (params LETerminateBIGInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LETerminateBIG started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x006A}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LETerminateBIG completed")
+	}
 
+	 return err
+}
 // LEBIGCreateSyncInput represents the input of the command specified in Section 7.8.106
 type LEBIGCreateSyncInput struct {
 	BIGHandle uint8
@@ -4753,55 +6061,68 @@ type LEBIGCreateSyncInput struct {
 }
 
 func (i LEBIGCreateSyncInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.BIGHandle)
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.BIGHandle))
 	binary.LittleEndian.PutUint16(w.Put(2), i.SyncHandle)
-	w.PutOne(i.Encryption)
+	w.PutOne(uint8(i.Encryption))
 	copy(w.Put(16), i.BroadcastCode[:])
-	w.PutOne(i.MSE)
+	w.PutOne(uint8(i.MSE))
 	binary.LittleEndian.PutUint16(w.Put(2), i.BIGSyncTimeout)
-	w.PutOne(i.NumBIS)
+	w.PutOne(uint8(i.NumBIS))
 	if len(i.BIS) != int(i.NumBIS) {
 		panic("len(i.BIS) != int(i.NumBIS)")
 	}
 	for _, m := range i.BIS {
-		w.PutOne(m)
+		w.PutOne(uint8(m))
 	}
-	return w.Data()
+	return w.Data
 }
 
 // LEBIGCreateSyncSync executes the command specified in Section 7.8.106 synchronously
 func (c *Commands) LEBIGCreateSyncSync (params LEBIGCreateSyncInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEBIGCreateSync started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x006B}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LEBIGCreateSync completed")
+	}
 
+	 return err
+}
 // LEBIGTerminateSyncInput represents the input of the command specified in Section 7.8.107
 type LEBIGTerminateSyncInput struct {
 	BIGHandle uint8
 }
 
 func (i LEBIGTerminateSyncInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.BIGHandle)
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.BIGHandle))
+	return w.Data
 }
 
 // LEBIGTerminateSyncOutput represents the output of the command specified in Section 7.8.107
@@ -4811,27 +6132,34 @@ type LEBIGTerminateSyncOutput struct {
 }
 
 func (o *LEBIGTerminateSyncOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
-	o.BIGHandle = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
+	o.BIGHandle = uint8(r.GetOne())
 	return r.Valid()
 }
 
 // LEBIGTerminateSyncSync executes the command specified in Section 7.8.107 synchronously
 func (c *Commands) LEBIGTerminateSyncSync (params LEBIGTerminateSyncInput, result *LEBIGTerminateSyncOutput) (*LEBIGTerminateSyncOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEBIGTerminateSync started")
+	}
 	if result == nil {
 		result = &LEBIGTerminateSyncOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x006C}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -4840,48 +6168,68 @@ func (c *Commands) LEBIGTerminateSyncSync (params LEBIGTerminateSyncInput, resul
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LEBIGTerminateSync completed")
+	}
 
+	 return result, err
+}
 // LERequestPeerSCAInput represents the input of the command specified in Section 7.8.108
 type LERequestPeerSCAInput struct {
 	ConnectionHandle uint16
 }
 
 func (i LERequestPeerSCAInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	return w.Data()
+	return w.Data
 }
 
 // LERequestPeerSCASync executes the command specified in Section 7.8.108 synchronously
 func (c *Commands) LERequestPeerSCASync (params LERequestPeerSCAInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LERequestPeerSCA started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x006D}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LERequestPeerSCA completed")
+	}
 
+	 return err
+}
 // LESetupISODataPathInput represents the input of the command specified in Section 7.8.109
 type LESetupISODataPathInput struct {
 	ConnectionHandle uint16
@@ -4894,15 +6242,15 @@ type LESetupISODataPathInput struct {
 }
 
 func (i LESetupISODataPathInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	w.PutOne(i.DataPathDirection)
-	w.PutOne(i.DataPathID)
+	w.PutOne(uint8(i.DataPathDirection))
+	w.PutOne(uint8(i.DataPathID))
 	copy(w.Put(5), i.CodecID[:])
-	encodeUint24(w.Put(3), i.ControllerDelay)
-	w.PutOne(i.CodecConfigurationLength)
+	bleutil.EncodeUint24(w.Put(3), i.ControllerDelay)
+	w.PutOne(uint8(i.CodecConfigurationLength))
 	w.PutSlice(i.CodecConfiguration)
-	return w.Data()
+	return w.Data
 }
 
 // LESetupISODataPathOutput represents the output of the command specified in Section 7.8.109
@@ -4912,27 +6260,34 @@ type LESetupISODataPathOutput struct {
 }
 
 func (o *LESetupISODataPathOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
 }
 
 // LESetupISODataPathSync executes the command specified in Section 7.8.109 synchronously
 func (c *Commands) LESetupISODataPathSync (params LESetupISODataPathInput, result *LESetupISODataPathOutput) (*LESetupISODataPathOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetupISODataPath started")
+	}
 	if result == nil {
 		result = &LESetupISODataPathOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x006E}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -4941,14 +6296,21 @@ func (c *Commands) LESetupISODataPathSync (params LESetupISODataPathInput, resul
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LESetupISODataPath completed")
+	}
 
+	 return result, err
+}
 // LERemoveISODataPathInput represents the input of the command specified in Section 7.8.110
 type LERemoveISODataPathInput struct {
 	ConnectionHandle uint16
@@ -4956,10 +6318,10 @@ type LERemoveISODataPathInput struct {
 }
 
 func (i LERemoveISODataPathInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	w.PutOne(i.DataPathDirection)
-	return w.Data()
+	w.PutOne(uint8(i.DataPathDirection))
+	return w.Data
 }
 
 // LERemoveISODataPathOutput represents the output of the command specified in Section 7.8.110
@@ -4969,27 +6331,34 @@ type LERemoveISODataPathOutput struct {
 }
 
 func (o *LERemoveISODataPathOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
 }
 
 // LERemoveISODataPathSync executes the command specified in Section 7.8.110 synchronously
 func (c *Commands) LERemoveISODataPathSync (params LERemoveISODataPathInput, result *LERemoveISODataPathOutput) (*LERemoveISODataPathOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LERemoveISODataPath started")
+	}
 	if result == nil {
 		result = &LERemoveISODataPathOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x006F}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -4998,14 +6367,21 @@ func (c *Commands) LERemoveISODataPathSync (params LERemoveISODataPathInput, res
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LERemoveISODataPath completed")
+	}
 
+	 return result, err
+}
 // LEISOTransmitTestInput represents the input of the command specified in Section 7.8.111
 type LEISOTransmitTestInput struct {
 	ConnectionHandle uint16
@@ -5013,10 +6389,10 @@ type LEISOTransmitTestInput struct {
 }
 
 func (i LEISOTransmitTestInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	w.PutOne(i.PayloadType)
-	return w.Data()
+	w.PutOne(uint8(i.PayloadType))
+	return w.Data
 }
 
 // LEISOTransmitTestOutput represents the output of the command specified in Section 7.8.111
@@ -5026,27 +6402,34 @@ type LEISOTransmitTestOutput struct {
 }
 
 func (o *LEISOTransmitTestOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
 }
 
 // LEISOTransmitTestSync executes the command specified in Section 7.8.111 synchronously
 func (c *Commands) LEISOTransmitTestSync (params LEISOTransmitTestInput, result *LEISOTransmitTestOutput) (*LEISOTransmitTestOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEISOTransmitTest started")
+	}
 	if result == nil {
 		result = &LEISOTransmitTestOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0070}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -5055,14 +6438,21 @@ func (c *Commands) LEISOTransmitTestSync (params LEISOTransmitTestInput, result 
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LEISOTransmitTest completed")
+	}
 
+	 return result, err
+}
 // LEISOReceiveTestInput represents the input of the command specified in Section 7.8.112
 type LEISOReceiveTestInput struct {
 	ConnectionHandle uint16
@@ -5070,10 +6460,10 @@ type LEISOReceiveTestInput struct {
 }
 
 func (i LEISOReceiveTestInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	w.PutOne(i.PayloadType)
-	return w.Data()
+	w.PutOne(uint8(i.PayloadType))
+	return w.Data
 }
 
 // LEISOReceiveTestOutput represents the output of the command specified in Section 7.8.112
@@ -5083,27 +6473,34 @@ type LEISOReceiveTestOutput struct {
 }
 
 func (o *LEISOReceiveTestOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
 }
 
 // LEISOReceiveTestSync executes the command specified in Section 7.8.112 synchronously
 func (c *Commands) LEISOReceiveTestSync (params LEISOReceiveTestInput, result *LEISOReceiveTestOutput) (*LEISOReceiveTestOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEISOReceiveTest started")
+	}
 	if result == nil {
 		result = &LEISOReceiveTestOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0071}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -5112,23 +6509,30 @@ func (c *Commands) LEISOReceiveTestSync (params LEISOReceiveTestInput, result *L
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LEISOReceiveTest completed")
+	}
 
+	 return result, err
+}
 // LEISOReadTestCountersInput represents the input of the command specified in Section 7.8.113
 type LEISOReadTestCountersInput struct {
 	ConnectionHandle uint16
 }
 
 func (i LEISOReadTestCountersInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	return w.Data()
+	return w.Data
 }
 
 // LEISOReadTestCountersOutput represents the output of the command specified in Section 7.8.113
@@ -5141,8 +6545,8 @@ type LEISOReadTestCountersOutput struct {
 }
 
 func (o *LEISOReadTestCountersOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	o.ReceivedPacketCount = binary.LittleEndian.Uint32(r.Get(4))
 	o.MissedPacketCount = binary.LittleEndian.Uint32(r.Get(4))
@@ -5152,19 +6556,26 @@ func (o *LEISOReadTestCountersOutput) decode(data []byte) bool {
 
 // LEISOReadTestCountersSync executes the command specified in Section 7.8.113 synchronously
 func (c *Commands) LEISOReadTestCountersSync (params LEISOReadTestCountersInput, result *LEISOReadTestCountersOutput) (*LEISOReadTestCountersOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEISOReadTestCounters started")
+	}
 	if result == nil {
 		result = &LEISOReadTestCountersOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0072}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -5173,23 +6584,30 @@ func (c *Commands) LEISOReadTestCountersSync (params LEISOReadTestCountersInput,
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LEISOReadTestCounters completed")
+	}
 
+	 return result, err
+}
 // LEISOTestEndInput represents the input of the command specified in Section 7.8.114
 type LEISOTestEndInput struct {
 	ConnectionHandle uint16
 }
 
 func (i LEISOTestEndInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	return w.Data()
+	return w.Data
 }
 
 // LEISOTestEndOutput represents the output of the command specified in Section 7.8.114
@@ -5202,8 +6620,8 @@ type LEISOTestEndOutput struct {
 }
 
 func (o *LEISOTestEndOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	o.ReceivedPacketCount = binary.LittleEndian.Uint32(r.Get(4))
 	o.MissedPacketCount = binary.LittleEndian.Uint32(r.Get(4))
@@ -5213,19 +6631,26 @@ func (o *LEISOTestEndOutput) decode(data []byte) bool {
 
 // LEISOTestEndSync executes the command specified in Section 7.8.114 synchronously
 func (c *Commands) LEISOTestEndSync (params LEISOTestEndInput, result *LEISOTestEndOutput) (*LEISOTestEndOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEISOTestEnd started")
+	}
 	if result == nil {
 		result = &LEISOTestEndOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0073}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -5234,14 +6659,21 @@ func (c *Commands) LEISOTestEndSync (params LEISOTestEndInput, result *LEISOTest
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LEISOTestEnd completed")
+	}
 
+	 return result, err
+}
 // LESetHostFeatureInput represents the input of the command specified in Section 7.8.115
 type LESetHostFeatureInput struct {
 	BitNumber uint8
@@ -5249,44 +6681,57 @@ type LESetHostFeatureInput struct {
 }
 
 func (i LESetHostFeatureInput) encode(data []byte) []byte {
-	w := writer{data: data};
-	w.PutOne(i.BitNumber)
-	w.PutOne(i.BitValue)
-	return w.Data()
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.BitNumber))
+	w.PutOne(uint8(i.BitValue))
+	return w.Data
 }
 
 // LESetHostFeatureSync executes the command specified in Section 7.8.115 synchronously
 func (c *Commands) LESetHostFeatureSync (params LESetHostFeatureInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetHostFeature started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0074}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LESetHostFeature completed")
+	}
 
+	 return err
+}
 // LEReadISOLinkQualityInput represents the input of the command specified in Section 7.8.116
 type LEReadISOLinkQualityInput struct {
 	ConnectionHandle uint16
 }
 
 func (i LEReadISOLinkQualityInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	return w.Data()
+	return w.Data
 }
 
 // LEReadISOLinkQualityOutput represents the output of the command specified in Section 7.8.116
@@ -5303,8 +6748,8 @@ type LEReadISOLinkQualityOutput struct {
 }
 
 func (o *LEReadISOLinkQualityOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	o.TxUnACKedPackets = binary.LittleEndian.Uint32(r.Get(4))
 	o.TxFlushedPackets = binary.LittleEndian.Uint32(r.Get(4))
@@ -5318,19 +6763,26 @@ func (o *LEReadISOLinkQualityOutput) decode(data []byte) bool {
 
 // LEReadISOLinkQualitySync executes the command specified in Section 7.8.116 synchronously
 func (c *Commands) LEReadISOLinkQualitySync (params LEReadISOLinkQualityInput, result *LEReadISOLinkQualityOutput) (*LEReadISOLinkQualityOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEReadISOLinkQuality started")
+	}
 	if result == nil {
 		result = &LEReadISOLinkQualityOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0075}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -5339,14 +6791,21 @@ func (c *Commands) LEReadISOLinkQualitySync (params LEReadISOLinkQualityInput, r
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LEReadISOLinkQuality completed")
+	}
 
+	 return result, err
+}
 // LEEnhancedReadTransmitPowerLevelInput represents the input of the command specified in Section 7.8.117
 type LEEnhancedReadTransmitPowerLevelInput struct {
 	ConnectionHandle uint16
@@ -5354,10 +6813,10 @@ type LEEnhancedReadTransmitPowerLevelInput struct {
 }
 
 func (i LEEnhancedReadTransmitPowerLevelInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	w.PutOne(i.PHY)
-	return w.Data()
+	w.PutOne(uint8(i.PHY))
+	return w.Data
 }
 
 // LEEnhancedReadTransmitPowerLevelOutput represents the output of the command specified in Section 7.8.117
@@ -5369,29 +6828,36 @@ type LEEnhancedReadTransmitPowerLevelOutput struct {
 }
 
 func (o *LEEnhancedReadTransmitPowerLevelOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
-	o.PHY = r.GetOne()
-	o.CurrentTransmitPowerLevel = r.GetOne()
+	o.PHY = uint8(r.GetOne())
+	o.CurrentTransmitPowerLevel = uint8(r.GetOne())
 	return r.Valid()
 }
 
 // LEEnhancedReadTransmitPowerLevelSync executes the command specified in Section 7.8.117 synchronously
 func (c *Commands) LEEnhancedReadTransmitPowerLevelSync (params LEEnhancedReadTransmitPowerLevelInput, result *LEEnhancedReadTransmitPowerLevelOutput) (*LEEnhancedReadTransmitPowerLevelOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEEnhancedReadTransmitPowerLevel started")
+	}
 	if result == nil {
 		result = &LEEnhancedReadTransmitPowerLevelOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0076}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -5400,14 +6866,21 @@ func (c *Commands) LEEnhancedReadTransmitPowerLevelSync (params LEEnhancedReadTr
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LEEnhancedReadTransmitPowerLevel completed")
+	}
 
+	 return result, err
+}
 // LEReadRemoteTransmitPowerLevelInput represents the input of the command specified in Section 7.8.118
 type LEReadRemoteTransmitPowerLevelInput struct {
 	ConnectionHandle uint16
@@ -5415,35 +6888,48 @@ type LEReadRemoteTransmitPowerLevelInput struct {
 }
 
 func (i LEReadRemoteTransmitPowerLevelInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	w.PutOne(i.PHY)
-	return w.Data()
+	w.PutOne(uint8(i.PHY))
+	return w.Data
 }
 
 // LEReadRemoteTransmitPowerLevelSync executes the command specified in Section 7.8.118 synchronously
 func (c *Commands) LEReadRemoteTransmitPowerLevelSync (params LEReadRemoteTransmitPowerLevelInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LEReadRemoteTransmitPowerLevel started")
+	}
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0077}, nil)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return err
+		goto log
 	}
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("LEReadRemoteTransmitPowerLevel completed")
+	}
 
+	 return err
+}
 // LESetPathLossReportingParametersInput represents the input of the command specified in Section 7.8.119
 type LESetPathLossReportingParametersInput struct {
 	ConnectionHandle uint16
@@ -5455,14 +6941,14 @@ type LESetPathLossReportingParametersInput struct {
 }
 
 func (i LESetPathLossReportingParametersInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	w.PutOne(i.HighThreshold)
-	w.PutOne(i.HighHysteresis)
-	w.PutOne(i.LowThreshold)
-	w.PutOne(i.LowHysteresis)
+	w.PutOne(uint8(i.HighThreshold))
+	w.PutOne(uint8(i.HighHysteresis))
+	w.PutOne(uint8(i.LowThreshold))
+	w.PutOne(uint8(i.LowHysteresis))
 	binary.LittleEndian.PutUint16(w.Put(2), i.MinTimeSpent)
-	return w.Data()
+	return w.Data
 }
 
 // LESetPathLossReportingParametersOutput represents the output of the command specified in Section 7.8.119
@@ -5472,27 +6958,34 @@ type LESetPathLossReportingParametersOutput struct {
 }
 
 func (o *LESetPathLossReportingParametersOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
 }
 
 // LESetPathLossReportingParametersSync executes the command specified in Section 7.8.119 synchronously
 func (c *Commands) LESetPathLossReportingParametersSync (params LESetPathLossReportingParametersInput, result *LESetPathLossReportingParametersOutput) (*LESetPathLossReportingParametersOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetPathLossReportingParameters started")
+	}
 	if result == nil {
 		result = &LESetPathLossReportingParametersOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0078}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -5501,14 +6994,21 @@ func (c *Commands) LESetPathLossReportingParametersSync (params LESetPathLossRep
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LESetPathLossReportingParameters completed")
+	}
 
+	 return result, err
+}
 // LESetPathLossReportingEnableInput represents the input of the command specified in Section 7.8.120
 type LESetPathLossReportingEnableInput struct {
 	ConnectionHandle uint16
@@ -5516,10 +7016,10 @@ type LESetPathLossReportingEnableInput struct {
 }
 
 func (i LESetPathLossReportingEnableInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	w.PutOne(i.Enable)
-	return w.Data()
+	w.PutOne(uint8(i.Enable))
+	return w.Data
 }
 
 // LESetPathLossReportingEnableOutput represents the output of the command specified in Section 7.8.120
@@ -5529,27 +7029,34 @@ type LESetPathLossReportingEnableOutput struct {
 }
 
 func (o *LESetPathLossReportingEnableOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
 }
 
 // LESetPathLossReportingEnableSync executes the command specified in Section 7.8.120 synchronously
 func (c *Commands) LESetPathLossReportingEnableSync (params LESetPathLossReportingEnableInput, result *LESetPathLossReportingEnableOutput) (*LESetPathLossReportingEnableOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetPathLossReportingEnable started")
+	}
 	if result == nil {
 		result = &LESetPathLossReportingEnableOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0079}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -5558,14 +7065,21 @@ func (c *Commands) LESetPathLossReportingEnableSync (params LESetPathLossReporti
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LESetPathLossReportingEnable completed")
+	}
 
+	 return result, err
+}
 // LESetTransmitPowerReportingEnableInput represents the input of the command specified in Section 7.8.121
 type LESetTransmitPowerReportingEnableInput struct {
 	ConnectionHandle uint16
@@ -5574,11 +7088,11 @@ type LESetTransmitPowerReportingEnableInput struct {
 }
 
 func (i LESetTransmitPowerReportingEnableInput) encode(data []byte) []byte {
-	w := writer{data: data};
+	w := bleutil.Writer{Data: data};
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
-	w.PutOne(i.LocalEnable)
-	w.PutOne(i.RemoteEnable)
-	return w.Data()
+	w.PutOne(uint8(i.LocalEnable))
+	w.PutOne(uint8(i.RemoteEnable))
+	return w.Data
 }
 
 // LESetTransmitPowerReportingEnableOutput represents the output of the command specified in Section 7.8.121
@@ -5588,27 +7102,34 @@ type LESetTransmitPowerReportingEnableOutput struct {
 }
 
 func (o *LESetTransmitPowerReportingEnableOutput) decode(data []byte) bool {
-	r := reader{data: data};
-	o.Status = r.GetOne()
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
 	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
 	return r.Valid()
 }
 
 // LESetTransmitPowerReportingEnableSync executes the command specified in Section 7.8.121 synchronously
 func (c *Commands) LESetTransmitPowerReportingEnableSync (params LESetTransmitPowerReportingEnableInput, result *LESetTransmitPowerReportingEnableOutput) (*LESetTransmitPowerReportingEnableOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LESetTransmitPowerReportingEnable started")
+	}
 	if result == nil {
 		result = &LESetTransmitPowerReportingEnableOutput{}
 	}
 
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x007A}, nil)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	buffer.Buffer = params.encode(buffer.Buffer)
-	response, err := c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
-		return result, err
+		goto log
 	}
 
 	if !result.decode(response) {
@@ -5617,11 +7138,18 @@ func (c *Commands) LESetTransmitPowerReportingEnableSync (params LESetTransmitPo
 
 	err = HciErrorToGo(response, err)
 
-	err2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 	if err2 != nil {
 		err = err2
 	}
 
-	return result, err
-}
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LESetTransmitPowerReportingEnable completed")
+	}
 
+	 return result, err
+}

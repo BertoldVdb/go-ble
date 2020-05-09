@@ -1,7 +1,9 @@
 package hcicmdmgr
 
 import (
-	"encoding/binary"
+	"encoding/hex"
+
+	"github.com/sirupsen/logrus"
 )
 
 func (s *CommandManager) updateIssueList(numCommands int) {
@@ -11,52 +13,54 @@ func (s *CommandManager) updateIssueList(numCommands int) {
 	   I have not seen this behavior in practice. */
 
 	s.Lock()
-	s.commandMaxIssue = numCommands
-	select {
-	case s.commandMaxIssueChanged <- struct{}{}:
-	default:
+	debugOldMaxIssue := s.commandMaxIssue
+	if !s.closed {
+		s.commandMaxIssue = numCommands
+		select {
+		case s.commandMaxIssueChanged <- struct{}{}:
+		default:
+		}
 	}
 	s.Unlock()
+
+	if s.logger != nil && s.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		s.logger.WithFields(logrus.Fields{
+			"0slots":    numCommands,
+			"1oldslots": debugOldMaxIssue,
+		}).Trace("Number of slots updated")
+	}
 }
 
-func (s *CommandManager) HandleEventCommandComplete(params []byte) error {
+func (s *CommandManager) commandComplete(CommandOpcode uint16, NumHCICommandPackets uint8, ReturnParameters []byte) error {
 	var err error
-	if len(params) >= 3 {
-		numCommands := int(params[0])
-		opcode := binary.LittleEndian.Uint16(params[1:3])
 
-		if opcode > 0 {
-			for i := range s.queues {
-				err2 := s.queues[i].commandComplete(false, opcode, params[3:])
-				if err2 != nil {
-					err = err2
-				}
+	if s.logger != nil && s.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		s.logger.WithFields(logrus.Fields{
+			"0opcode": CommandOpcode,
+			"1slots":  NumHCICommandPackets,
+			"2return": hex.EncodeToString(ReturnParameters),
+		}).Trace("Command complete/status event received")
+	}
+
+	if CommandOpcode > 0 {
+		for i := range s.queues {
+			err2 := s.queues[i].commandComplete(false, CommandOpcode, ReturnParameters)
+			if err2 != nil {
+				err = err2
 			}
 		}
-
-		s.updateIssueList(numCommands)
 	}
+
+	s.updateIssueList(int(NumHCICommandPackets))
+
 	return err
 }
 
-func (s *CommandManager) HandleEventCommandStatus(params []byte) error {
-	var err error
+func (s *CommandManager) HandleEventCommandComplete(CommandOpcode uint16, NumHCICommandPackets uint8, ReturnParameters []byte) error {
+	return s.commandComplete(CommandOpcode, NumHCICommandPackets, ReturnParameters)
+}
 
-	if len(params) == 4 {
-		status := params[0:1]
-		numCommands := int(params[1])
-		opcode := binary.LittleEndian.Uint16(params[2:4])
+func (s *CommandManager) HandleEventCommandStatus(CommandOpcode uint16, NumHCICommandPackets uint8, Status uint8) error {
+	return s.commandComplete(CommandOpcode, NumHCICommandPackets, []byte{Status})
 
-		if opcode > 0 {
-			for i := range s.queues {
-				err2 := s.queues[i].commandComplete(true, opcode, status)
-				if err2 != nil {
-					err = err2
-				}
-			}
-		}
-
-		s.updateIssueList(numCommands)
-	}
-	return err
 }

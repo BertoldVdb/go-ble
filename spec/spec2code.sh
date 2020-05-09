@@ -16,5 +16,3 @@ perl generate.pl parsed.txt 6 >output/testing.go
 perl generate.pl parsed_events.txt 7 >output/events.go
 perl generate.pl parsed.txt 8 >output/le.go
 
-rm parsed.txt
-rm parsed_events.txt

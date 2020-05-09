@@ -16,16 +16,38 @@ my $ocf = "";
 my $point = "";
 my $varcnt = 0;
 my $desired = int(@ARGV[1]);
+my $handlerStruct = "";
+my $eventDecoder = "";
+my $subevent = 0;
+my $eventCtr = 0;
 
-print <<EOF;
+if ($desired == 7){
+    print <<EOF;
+package hcievents
+
+import (
+\t"sync"
+\t"encoding/binary"
+\thcicmdmgr "github.com/BertoldVdb/go-ble/hci/cmdmgr"
+\tbleutil "github.com/BertoldVdb/go-ble/util"
+\thcicommands "github.com/BertoldVdb/go-ble/hci/commands"
+\t"github.com/sirupsen/logrus"
+)
+
+EOF
+}else{
+    print <<EOF;
 package hcicommands
 
 import (
 \t"encoding/binary"
 \thcicmdmgr "github.com/BertoldVdb/go-ble/hci/cmdmgr"
+\tbleutil "github.com/BertoldVdb/go-ble/util"
+\t"github.com/sirupsen/logrus"
 )
 
 EOF
+}
 
 
 sub getTopic{
@@ -59,6 +81,7 @@ sub lenToType {
     if ($len == 2) { return "uint16"; }
     if ($len == 3) { return "uint32"; }
     if ($len == 4) { return "uint32"; }
+    if ($len == 6) { return "bleutil.MacAddr"; }
     if ($len == 8) { return "uint64"; }
     return "[$len]byte";
 }
@@ -67,6 +90,8 @@ sub decodeToType {
     my $len=int(@_[0]);
     my $fn = @_[1];
     my $lenVar = @_[2];
+    my $type = @_[3];
+
     if ($len == 0) { 
         if ($lenVar eq "" ){
             return "$fn = append($fn"."[:0], r.GetRemainder()...)"; 
@@ -74,10 +99,11 @@ sub decodeToType {
             return "$fn = append($fn"."[:0], r.Get($lenVar)...)"; 
         }
     }
-    if ($len == 1) { return "$fn = r.GetOne()"; }
+    if ($len == 1) { return "$fn = $type(r.GetOne())"; }
     if ($len == 2) { return "$fn = binary.LittleEndian.Uint16(r.Get(2))"; }
-    if ($len == 3) { return "$fn = decodeUint24(r.Get(3))"; }
+    if ($len == 3) { return "$fn = bleutil.DecodeUint24(r.Get(3))"; }
     if ($len == 4) { return "$fn = binary.LittleEndian.Uint32(r.Get(4))"; }
+    if ($len == 6) { return "$fn.Decode(r.Get(6))"; }
     if ($len == 8) { return "$fn = binary.LittleEndian.Uint64(r.Get(8))"; }
     return "copy($fn"."[:], r.Get($len))";
 }
@@ -86,10 +112,11 @@ sub encodeToType {
     my $len=int(@_[0]);
     my $fn = @_[1];
     if ($len == 0) { return "w.PutSlice($fn)"; }
-    if ($len == 1) { return "w.PutOne($fn)"; }
+    if ($len == 1) { return "w.PutOne(uint8($fn))"; }
     if ($len == 2) { return "binary.LittleEndian.PutUint16(w.Put(2), $fn)"; }
-    if ($len == 3) { return "encodeUint24(w.Put(3), $fn)"; }
+    if ($len == 3) { return "bleutil.EncodeUint24(w.Put(3), $fn)"; }
     if ($len == 4) { return "binary.LittleEndian.PutUint32(w.Put(4), $fn)"; }
+    if ($len == 6) { return "$fn.Encode(w.Put(6))"; }
     if ($len == 8) { return "binary.LittleEndian.PutUint64(w.Put(8), $fn)"; }
     return "copy(w.Put($len), $fn"."[:])";
 }
@@ -108,8 +135,8 @@ sub finalizeStruct {
     }
 
     $inStruct = "// $newName"."Input represents the input of the command specified in $comment\ntype $newName"."Input struct {\n$inStruct";
-    $inEncode = "func (i $newName"."Input) encode(data []byte) []byte {\n\tw := writer{data: data};\n$inEncode";
-    $outDecode = "func (o *$newName"."$out) decode(data []byte) bool {\n\tr := reader{data: data};\n$outDecode";
+    $inEncode = "func (i $newName"."Input) encode(data []byte) []byte {\n\tw := bleutil.Writer{Data: data};\n$inEncode";
+    $outDecode = "func (o *$newName"."$out) decode(data []byte) bool {\n\tr := bleutil.Reader{Data: data};\n$outDecode";
     
     my $params = "";
     my $return = "error";
@@ -117,7 +144,7 @@ sub finalizeStruct {
    
     if ($hasInput) {
         print $inStruct."}\n\n";
-        print $inEncode."\treturn w.Data()\n}\n\n";
+        print $inEncode."\treturn w.Data\n}\n\n";
         $params .= "params $name"."Input";
     }
     if ($hasOutput) {
@@ -133,7 +160,22 @@ sub finalizeStruct {
 
     if($ogf != 7){
         print "// $name"."Sync executes the command specified in $comment synchronously\n";
-        print "func (c *Commands) $name"."Sync ($params) $return {\n";
+        print "func (c *Commands) $name"."Sync ($params) $return {\n\tvar err2 error\n";
+        if ($hasOutput || $hasStatus){
+            print "\tvar response []byte\n";
+        }
+        
+        print <<EOF;
+\tif c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+\t\tc.logger.WithFields(logrus.Fields{
+EOF
+        if($hasInput){
+            print "\t\t\t \"0params\": params,\n";
+        }
+        print <<EOF;
+\t\t}).Trace("$name started")
+\t}
+EOF
 
         if($hasOutput){
             print <<EOF;
@@ -147,7 +189,7 @@ EOF
         print <<EOF;
 \tbuffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: $ogf, OCF: $ocf}, nil)
 \tif err != nil {
-\t\treturn $returnVal
+\t\tgoto log
 \t}
 
 EOF
@@ -158,13 +200,13 @@ EOF
 
         my $resp = "_, err =";
         if ($hasOutput || $hasStatus){
-            $resp = "response, err :=";
+            $resp = "response, err =";
         }
 
         print <<EOF;
 \t$resp c.hcicmdmgr.CommandRunPutBuffer(buffer)
 \tif err != nil {
-\t\treturn $returnVal
+\t\tgoto log
 \t}
 
 EOF
@@ -184,14 +226,96 @@ EOF
 
         print <<EOF;
 
-\terr2 := c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+\terr2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
 \tif err2 != nil {
 \t\terr = err2
 \t}
 
-\treturn $returnVal
-}
+log:
+\tif c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+\t\tc.logger.WithError(err).WithFields(logrus.Fields{
+EOF
+        if($hasInput){
+           print "\t\t\t \"0params\": params,\n";
+        }
+        if($hasOutput){
+            print "\t\t\t \"1result\": result,\n";
+        }
+        print <<EOF;
+\t\t}).Debug("$name completed")
+\t}
 
+\t return $returnVal
+}
+EOF
+    }else{
+        my $event = $newName.$out;
+        my $eventLc = lcfirst $event;
+        print <<EOF;
+// ${event}CallbackType is the type of the callback function for $event.
+type ${event}CallbackType func(*$event) *$event
+
+// Set${event}Callback configures the callback for $event. Passing nil will disable the callback.
+func (e *EventHandler) Set${event}Callback(cb ${event}CallbackType) error {
+\te.cbMutex.Lock()
+\te.$eventLc\Callback = cb
+\te.cbMutex.Unlock()
+
+\t return e.eventChanged($eventCtr, cb != nil);
+}
+EOF
+
+        $eventCtr++;
+        if($eventCtr ==30 || $eventCtr == 54 || $eventCtr == 57){
+            $eventCtr++;
+        }
+        if($eventCtr == 35){
+            $eventCtr = 43;
+        }
+        if($eventCtr == 61){
+            $eventCtr = 100;
+        }
+        if($eventCtr == 114){
+            $eventCtr = 200;
+        }
+        if($eventCtr == 234){
+            $eventCtr = 114;
+        }
+
+        if ($handlerStruct eq "") {
+            $handlerStruct = "type EventHandler struct {\n\tlogger *logrus.Entry\n\thcicmdmgr *hcicmdmgr.CommandManager\n\tcmds *hcicommands.Commands\n\tcbMutex sync.RWMutex\n\tenableMutex sync.Mutex\n\teventMask uint64\n\teventMask2 uint64\n\teventMaskLe uint64\n\n";
+        }
+
+        $handlerStruct .= "\t$eventLc\Callback $event\CallbackType\n\t$eventLc *$event\n\n";
+
+        my $subeventStr = sprintf("%02X", $subevent);
+        my $dlevel = "Debug";
+        if ($event eq "CommandCompleteEvent" || $event eq "CommandStatusEvent" || $event eq "LEAdvertisingReportEvent"){
+            $dlevel = "Trace";
+        }
+
+        $eventDecoder .= <<EOF;
+\tcase $ocf$subeventStr:
+\t\te.cbMutex.RLock()
+\t\tcb := e.$eventLc\Callback
+\t\te.cbMutex.RUnlock()
+
+\t\tif cb != nil {
+\t\t\tif e.$eventLc == nil {
+\t\t\t\te.$eventLc = &${event}\{}
+\t\t\t}
+
+\t\t\tif e.$eventLc.decode(params) {
+\t\t\t\tif e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.${dlevel}Level) {
+\t\t\t\t\te.logger.WithField("0data", e.$eventLc).$dlevel("$event decoded")
+\t\t\t\t}
+\t\t\t\te.$eventLc = cb(e.$eventLc)
+\t\t\t}
+\t\t}else{
+\t\t\tif e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+\t\t\t\te.logger.Debug("$event has no callback")
+\t\t\t}
+\t\t}
 EOF
     }
 }
@@ -206,7 +330,10 @@ sub resetStruct(){
     $hasOutput = 0;
     $hasStatus = 0;
     %codeValues = ();
+    $subevent = 0;
 }
+
+&resetStruct();
 
 sub codeValue(){
     my $sn = @_[0];
@@ -220,7 +347,7 @@ sub codeValue(){
 
     my $value = "int($sn.$part)";
     if($part =~ m/^Bitssetin(.*)$/){
-        $extra = "\tvar$varcnt := countSetBits(uint64($sn.$1))\n";
+        $extra = "\tvar$varcnt := bleutil.CountSetBits(uint64($sn.$1))\n";
         $value = "var$varcnt";
         $varcnt++;
     }elsif($part =~ m/^SUM\((.*)\[(.*)\]\)$/){
@@ -254,6 +381,9 @@ while(<FILE>){
         $active = 0;
         if (int($ogf) == $desired || $desired<=0) {
             $active = 1;
+            if($ogf==7){
+                $hasOutput = 1;
+            }
         }
     }elsif($active == 1){
         my $array="";
@@ -261,10 +391,17 @@ while(<FILE>){
             $array .= "[]";
             @parts[2] = substr(@parts[2], 0, length(@parts[2])-3);
         }
+        if (@parts[1] eq "s"){
+            $subevent = hex(@parts[2]);
+
+        }
         
         @parts[2] = &clean(@parts[2]);
         @parts[4] = &clean(@parts[4]);
         my $type = &lenToType(@parts[3]);
+        if (@parts[2] =~ m/AddressType/){
+            $type = "bleutil.MacAddrType";
+        }
 
         my $value = "\t".@parts[2]." $array$type\n";
         if (@parts[1] eq "3"){
@@ -300,11 +437,11 @@ while(<FILE>){
                 $outDecode .= "\t}\n";
                 $outDecode .= "\to.".@parts[2]." = o.".@parts[2]."[:$value]\n";
                 $outDecode .= "\tfor j:=0; j<$value; j++ {\n";
-                $outDecode .= "\t\t".&decodeToType(@parts[3], "o.".@parts[2]."[j]", "int(o.DataLength[j])")."\n";
+                $outDecode .= "\t\t".&decodeToType(@parts[3], "o.".@parts[2]."[j]", "int(o.DataLength[j])",$type)."\n";
                 $outDecode .= "\t}\n";
 
             }else{
-                $outDecode .= "\t".&decodeToType(@parts[3], "o.".@parts[2], "")."\n";
+                $outDecode .= "\t".&decodeToType(@parts[3], "o.".@parts[2], "",$type)."\n";
             }
         }
         if (@parts[1] eq "5"){
@@ -318,3 +455,17 @@ while(<FILE>){
     }
 }
 close (FILE);
+
+if ($handlerStruct ne ""){
+    print "\n\n$handlerStruct}";
+}
+if ($eventDecoder ne ""){
+    print <<EOF;
+
+
+func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
+\tswitch eventCode {
+$eventDecoder\t}
+}
+EOF
+}

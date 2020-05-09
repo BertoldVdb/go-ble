@@ -22,7 +22,7 @@ while(<FILE>){
                 if ($event == 1 && $state == 4){
                     print " |5|TERM\n";
                 }
-                print "c|$1|$2|$3|";
+                print "\nc|$1|$2|$3|";
                 $state = 1;
             }
         }
@@ -55,7 +55,7 @@ while(<FILE>){
 
                 print " |$state|$name|$size\n";
             }
-            if ($event == 1 && $_ =~ m/\s+(.*?)\s+Subevent Code for/){
+            if ($event == 1 && $_ =~ m/\s+(.*?)\s+Subevent (Code|code) for/){
                 print " |s|$1\n";
             }
             if ($_ =~ m/Condition for (.*?) = 0x(.*?)/){
