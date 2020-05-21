@@ -20,7 +20,7 @@ func New(logger *logrus.Entry, dev hciinterface.HCIInterface) *BluetoothStack {
 		logger: logger,
 	}
 
-	s.Controller = hci.New(bleutil.LogWithPrefix(logger, "hci"), dev,
+	s.Controller = hci.New(bleutil.LogWithPrefix(logger, "hci"), dev, false,
 		func() error {
 			if s.BLEScanner != nil {
 				return s.BLEScanner.Run()

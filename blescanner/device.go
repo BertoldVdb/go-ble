@@ -1,8 +1,6 @@
 package blescanner
 
 import (
-	"fmt"
-	"sort"
 	"sync"
 	"time"
 
@@ -33,42 +31,9 @@ type BLEDevice struct {
 	services [3][]bleutil.UUID
 }
 
-func (d *BLEDevice) StringSummary() string {
-	txPower := ""
-	if d.txPower > -128 {
-		txPower = fmt.Sprintf("txPower=%ddBm ", d.txPower)
-	}
-
-	result := fmt.Sprintf("Addr='%s' Name='%s' Flags=%02x Connectable=%v RSSI=%ddBm %sLastSeen=%dms",
-		d.addr, d.name, d.flags, d.IsConnectable(), d.rssi, txPower, time.Now().Sub(d.lastSeenDev).Milliseconds())
-	if len(d.services[0]) > 0 {
-		result += fmt.Sprintf("\nUUID-16 services:   %v", d.services[0])
-	}
-	if len(d.services[1]) > 0 {
-		result += fmt.Sprintf("\nUUID-32 services:   %v", d.services[1])
-	}
-	if len(d.services[2]) > 0 {
-		result += fmt.Sprintf("\nUUID-128 services:  %v", d.services[2])
-	}
-
-	if d.gapFields != nil {
-		var types sort.IntSlice
-		for i := range d.gapFields {
-			types = append(types, int(i))
-		}
-		types.Sort()
-		for _, i := range types {
-			m := d.gapFields[uint8(i)]
-			result += fmt.Sprintf("\n%02X: %s", i, m)
-		}
-	} else {
-		result += fmt.Sprintf("\n%02X: %s", d.gapSingle.Type, d.gapSingle)
-	}
-
-	return result
-}
-
 func (s *BLEScanner) getDevice(addr bleutil.BLEAddr, create bool) (*BLEDevice, bool) {
+	s.handleTimeout()
+
 	if create {
 		s.Lock()
 		defer s.Unlock()
@@ -115,17 +80,28 @@ func (s *BLEScanner) getDevice(addr bleutil.BLEAddr, create bool) (*BLEDevice, b
 }
 
 func (s *BLEScanner) handleTimeout() {
-	s.Lock()
-	defer s.Unlock()
-
 	now := time.Now()
 
-	for i, m := range s.devices {
-		if now.After(m.lastSeen.Add(30 * time.Second)) {
-			delete(s.devices, i)
+	s.RLock()
+	needClean := now.After(s.nextCleanup)
+	s.RUnlock()
 
-			if s.logger != nil {
-				s.logger.WithField("0addr", m.addr).Info("Device expired")
+	if needClean {
+		s.Lock()
+		defer s.Unlock()
+
+		s.nextCleanup = now.Add(15 * time.Second)
+		if s.logger != nil {
+			s.logger.WithField("0numDevices", len(s.devices)).Debug("Cleaning expired devices")
+		}
+
+		for i, m := range s.devices {
+			if m.isExpired() {
+				delete(s.devices, i)
+
+				if s.logger != nil {
+					s.logger.WithField("0addr", m.addr).Info("Device removed due to expiry")
+				}
 			}
 		}
 	}
@@ -143,17 +119,35 @@ func (dev *BLEDevice) Release() {
 	dev.RUnlock()
 }
 
-func (s *BLEScanner) KnownDevicesAddresses() []bleutil.BLEAddr {
+func (s *BLEScanner) KnownDevicesAddresses(result []bleutil.BLEAddr) []bleutil.BLEAddr {
+	s.handleTimeout()
+
 	s.RLock()
 	defer s.RUnlock()
 
-	var result []bleutil.BLEAddr
+	result = result[:0]
 
 	for _, m := range s.devices {
-		result = append(result, m.addr)
+		if !m.isExpired() {
+			result = append(result, m.addr)
+		}
 	}
 
 	return result
+}
+
+/* Warning: this function needs to be called with the scanner lock, not the
+ * device lock */
+func (dev *BLEDevice) isExpired() bool {
+	return time.Now().After(dev.lastSeen.Add(30 * time.Second))
+}
+
+func (dev *BLEDevice) LastSeen() time.Time {
+	return dev.lastSeenDev
+}
+
+func (dev *BLEDevice) GetRSSI() int8 {
+	return dev.rssi
 }
 
 func (dev *BLEDevice) IsConnectable() bool {

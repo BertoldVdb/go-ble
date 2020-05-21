@@ -76,6 +76,7 @@ func (s *BLEScanner) handleScanResult(ad *hcievents.LEAdvertisingReportEvent) *h
 					"0addr": dev.addr,
 					"1rssi": dev.rssi,
 				}).Info("Found new device")
+
 			} else if s.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
 				s.logger.WithFields(logrus.Fields{
 					"0addr": dev.addr,

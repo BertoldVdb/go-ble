@@ -1,69 +1,77 @@
 package main
 
 import (
-	"fmt"
-	"log"
-	"math/rand"
-	"net"
+	"flag"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/BertoldVdb/go-ble"
-	hcidriverserial "github.com/BertoldVdb/go-ble/hci/drivers/serial"
-	prefixed "github.com/BertoldVdb/logrus-prefixed-formatter"
-	"github.com/sirupsen/logrus"
+	blescannerjson "github.com/BertoldVdb/go-ble/blescanner/json"
+	hcidrivers "github.com/BertoldVdb/go-ble/hci/drivers"
+	bleutilparam "github.com/BertoldVdb/go-ble/util/param"
+	"github.com/BertoldVdb/go-misc/httplog"
+	"github.com/BertoldVdb/go-misc/logrusconfig"
 )
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
-	logrus.ErrorKey = " error"
-	logger := logrus.New()
-	logger.SetLevel(logrus.DebugLevel)
-	customFormatter := new(prefixed.TextFormatter)
-	customFormatter.TimestampFormat = "2006-01-02 15:04:05"
-	customFormatter.FullTimestamp = true
-	customFormatter.PrefixPadding = 20
-	//  customFormatter.PadLevelText = true
-	customFormatter.SpacePadding = 50
-	logger.SetFormatter(customFormatter)
-	entry := logrus.NewEntry(logger)
+	listenPort := flag.String("listen", "8080", "The port to listen on")
+	logrusconfig.InitParam()
+	bleutilparam.Init()
+
+	flag.Parse()
+
+	deviceName, err := bleutilparam.GetDeviceName()
+	if err != nil {
+		return
+	}
+
+	logger := logrusconfig.GetLogger(0)
+
+	dev, err := hcidrivers.Open(deviceName)
+	if err != nil {
+		logger.Fatalln(err)
+	}
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 
-	conn, err := net.Dial("tcp", "192.168.0.30:3001")
-	//conn, err := net.Dial("tcp", "192.168.0.23:3000")
-	//conn, err := net.Dial("tcp", "127.0.0.1:3001")
-	if err != nil {
-		log.Fatalln(err)
-	}
-	defer conn.Close()
-
-	dev, err := hcidriverserial.OpenPort(conn)
-	if err != nil {
-		log.Println("  Failed to make H4 protocol interface:", err)
-		return
-	}
-
-	stack := ble.New(entry, dev)
+	stack := ble.New(logger, dev)
 	if stack == nil {
-		log.Fatalln("Could not make stack")
+		logger.Fatalln("Could not make stack")
 	}
 
 	go func() {
 		<-c
 		stack.Close()
-		//os.Exit(1)
+	}()
+
+	loggerHTTP := logger.WithField("prefix", "http")
+
+	go func() {
+		for i := 1; i <= 10; i++ {
+			time.Sleep(1 * time.Second)
+			loggerHTTP.Warnf("Visit http://127.0.0.1:%s/ to see the output of this program (%d/10)", *listenPort, i)
+		}
 	}()
 
 	go func() {
-		log.Fatalln(stack.Run())
+		traceHTTP := httplog.HTTPLog{
+			LogOut:            loggerHTTP.Debugf,
+			CorrelationHeader: "X-Request-ID",
+			SkipInfo:          true,
+		}
+
+		http.HandleFunc("/ble/scan", blescannerjson.New(stack.BLEScanner).HTTPHandler)
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Write(MustAsset("html/index.html"))
+		})
+
+		loggerHTTP.Errorln(http.ListenAndServe(":"+*listenPort, traceHTTP.GetHandler(http.DefaultServeMux)))
+		stack.Close()
 	}()
 
-	for {
-		time.Sleep(500 * time.Millisecond)
-		fmt.Fprintf(os.Stderr, "\033[32m\033[H\033[2JTime: %s\n\n%s\n", time.Now(), stack.BLEScanner.StringSummary())
-	}
+	logger.Fatalln(stack.Run())
 }

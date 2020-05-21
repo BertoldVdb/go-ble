@@ -95,12 +95,24 @@ func (d *BLEDevice) handleRecord(event EventType, record []byte) {
 	}
 }
 
-func (d *BLEDevice) GetGAPRecord(gapType uint8, buf *GAPRecord) *GAPRecord {
+func (d *BLEDevice) GetGAPTypes(result []int) []int {
+	result = result[:0]
+
+	if d.gapFields != nil {
+		for key := range d.gapFields {
+			result = append(result, int(key))
+		}
+	}
+
+	return result
+}
+
+func (d *BLEDevice) GetGAPRecord(gapType int, buf *GAPRecord) *GAPRecord {
 	if d.gapFields == nil {
 		return nil
 	}
 
-	internal, ok := d.gapFields[gapType]
+	internal, ok := d.gapFields[uint8(gapType)]
 	if !ok || internal == nil {
 		return nil
 	}
@@ -237,4 +249,18 @@ func (d *BLEDevice) handleUUID(gap *GAPRecord) {
 			}
 		}
 	}
+}
+
+func (d *BLEDevice) GetServices(serviceType int, in []bleutil.UUID) []bleutil.UUID {
+	in = in[:0]
+
+	if serviceType < 0 {
+		in = append(in, d.services[0]...)
+		in = append(in, d.services[1]...)
+		in = append(in, d.services[2]...)
+	} else {
+		in = append(in, d.services[serviceType]...)
+	}
+
+	return in
 }

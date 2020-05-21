@@ -30,7 +30,7 @@ func (s *commandQueue) commandRunGetToken(cmd HCICommand, sync bool, cb CommandC
 }
 
 func (s *commandQueue) commandRunPutToken(token *commandToken) ([]byte, error) {
-	token.timeoutTime = time.Now().Add(time.Second)
+	token.timeoutTime = time.Now().Add(5 * time.Second)
 	token.data[3] = byte(len(token.data) - 4)
 
 	err := s.commandQueue.CommitToken(token)

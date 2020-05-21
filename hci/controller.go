@@ -40,7 +40,7 @@ type ControllerInfo struct {
 	BdAddr              *hcicommands.InformationalReadBDADDROutput
 }
 
-func New(logger *logrus.Entry, dev hciinterface.HCIInterface, cbReady ReadyCallback, cbClose CloseCallback) *Controller {
+func New(logger *logrus.Entry, dev hciinterface.HCIInterface, awaitStartup bool, cbReady ReadyCallback, cbClose CloseCallback) *Controller {
 	c := &Controller{
 		logger:  logger,
 		dev:     dev,
@@ -48,7 +48,7 @@ func New(logger *logrus.Entry, dev hciinterface.HCIInterface, cbReady ReadyCallb
 		cbClose: cbClose,
 	}
 
-	c.Hcicmdmgr = hcicmdmgr.New(bleutil.LogWithPrefix(logger, "cmdmgr"), []int{10}, true, func(data []byte) error {
+	c.Hcicmdmgr = hcicmdmgr.New(bleutil.LogWithPrefix(logger, "cmdmgr"), []int{10}, awaitStartup, func(data []byte) error {
 		if logger != nil && logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
 			logger.WithFields(logrus.Fields{
 				"0data": hex.EncodeToString(data),

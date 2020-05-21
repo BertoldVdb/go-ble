@@ -18,8 +18,6 @@ type commandQueue struct {
 	commandActive []*commandToken
 
 	tokenRemoved chan (struct{})
-
-	closed bool
 }
 
 type commandToken struct {
@@ -57,10 +55,6 @@ func (s *commandQueue) Init(parent *CommandManager, numSlots int, id int) {
 }
 
 func (s *commandQueue) findToken(opcode uint16, clear bool) *commandToken {
-	if s.parent.closed {
-		return nil
-	}
-
 	for i, m := range s.commandActive {
 		if m != nil && m.opcode == opcode {
 			token := s.commandActive[i]
@@ -79,28 +73,14 @@ func (s *commandQueue) findToken(opcode uint16, clear bool) *commandToken {
 }
 
 func (s *commandQueue) closeQueue() {
-	/* Return active tokens */
 	s.parent.Lock()
-	if s.closed {
-		s.parent.Unlock()
-		return
-	}
-	s.closed = true
-
-	var toComplete []*commandToken
+	defer s.parent.Unlock()
 
 	for i, m := range s.commandActive {
 		if m != nil {
-			toComplete = append(toComplete, m)
 			s.commandActive[i] = nil
+			s.tokenComplete(m, ErrorWorkerClosed, nil)
 		}
-	}
-
-	close(s.tokenRemoved)
-	s.parent.Unlock()
-
-	for _, m := range toComplete {
-		s.tokenComplete(m, ErrorWorkerClosed, nil)
 	}
 
 	s.commandQueue.Close()
@@ -116,16 +96,16 @@ func (s *commandQueue) waitCondition(condition chan (struct{}), timeout <-chan (
 	stuckCnt := 0
 	for {
 		select {
-		case _, ok := <-condition:
-			if !ok {
-				return ErrorWorkerClosed
-			}
+		case <-s.parent.closeFlag.Chan():
+			return ErrorWorkerClosed
 
+		case <-condition:
 			s.parent.Lock()
 			return nil
+
 		case <-timeout:
 			stuckCnt++
-			if stuckCnt >= 2 {
+			if stuckCnt >= 10 {
 				s.parent.logger.WithField("0worker", s.workerID).Error("Timeout: " + reason)
 				return ErrorTimeout
 			}
@@ -151,6 +131,9 @@ func (s *commandQueue) Worker() error {
 
 	for {
 		select {
+		case <-s.parent.closeFlag.Chan():
+			return ErrorWorkerClosed
+
 		case now := <-stuckTimer.C:
 			s.parent.Lock()
 			for _, m := range s.commandActive {
@@ -164,6 +147,7 @@ func (s *commandQueue) Worker() error {
 				}
 			}
 			s.parent.Unlock()
+
 		case tokenRaw, ok := <-commitChan:
 			if !ok {
 				return ErrorWorkerClosed
@@ -172,6 +156,11 @@ func (s *commandQueue) Worker() error {
 
 			/* Can we send more commands? */
 			s.parent.Lock()
+			if s.parent.closeFlag.IsClosed() {
+				s.parent.Unlock()
+				return ErrorWorkerClosed
+			}
+
 			for s.parent.commandMaxIssue == 0 {
 				err := s.waitCondition(s.parent.commandMaxIssueChanged, stuckTimer.C, "Queue blocked due slot exhaustion")
 				if err != nil {
@@ -207,7 +196,7 @@ func (s *commandQueue) Worker() error {
 			s.parent.commandMaxIssue--
 
 			/* Check if we can unlock another queue */
-			if !s.parent.closed && s.parent.commandMaxIssue > 0 {
+			if s.parent.commandMaxIssue > 0 {
 				select {
 				case s.parent.commandMaxIssueChanged <- struct{}{}:
 				default:

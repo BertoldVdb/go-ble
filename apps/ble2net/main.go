@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"net"
 	"os/exec"
@@ -13,11 +12,12 @@ import (
 	hcidrivers "github.com/BertoldVdb/go-ble/hci/drivers"
 	hciinterface "github.com/BertoldVdb/go-ble/hci/drivers/interface"
 	hcidriverserial "github.com/BertoldVdb/go-ble/hci/drivers/serial"
+	bleutilparam "github.com/BertoldVdb/go-ble/util/param"
 )
 
 type config struct {
 	listenAddr *string
-	deviceName *string
+	deviceName string
 
 	connectCommand    *string
 	disconnectCommand *string
@@ -58,7 +58,7 @@ func clientHandler(parentWg *sync.WaitGroup, currentConn net.Conn, config *confi
 		}
 	}
 
-	hwDev, err := hcidrivers.Open(*config.deviceName)
+	hwDev, err := hcidrivers.Open(config.deviceName)
 	if err != nil {
 		log.Println("  Failed to open hardware interface:", err)
 		return
@@ -115,27 +115,18 @@ func clientHandler(parentWg *sync.WaitGroup, currentConn net.Conn, config *confi
 
 func main() {
 	config := config{}
-
 	config.listenAddr = flag.String("listen", ":3000", "The address to listen on")
-	config.deviceName = flag.String("device", "", "The device to use. If not specified, a list of all devices is printed")
 	config.connectCommand = flag.String("connect", "", "Command to execute upon connection")
 	config.disconnectCommand = flag.String("disconnect", "", "Command to execute upon disconnection")
 	config.resetEvent = flag.Bool("reset", false, "Send reset complete event on connect")
 
+	bleutilparam.Init()
+
 	flag.Parse()
 
-	if *config.deviceName == "" {
-		fmt.Println("No device specified (-device).")
-		fmt.Println("Listing all known devices:")
-		devices, err := hcidrivers.ListDevices()
-		if err != nil || len(devices) == 0 {
-			fmt.Println("  No devices found")
-		} else {
-			for i, m := range devices {
-				fmt.Printf("  Device %d: %s", i, m)
-				fmt.Println()
-			}
-		}
+	var err error
+	config.deviceName, err = bleutilparam.GetDeviceName()
+	if err != nil {
 		return
 	}
 

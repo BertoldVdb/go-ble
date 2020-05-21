@@ -1,7 +1,6 @@
 package blescanner
 
 import (
-	"sort"
 	"sync"
 	"time"
 
@@ -31,6 +30,9 @@ type BLEScanner struct {
 	devices                      map[uint64]*BLEDevice
 	manufacturerSpecificCallback map[uint16]GAPCallback
 	deviceUpdatedCallbacks       []DeviceUpdatedCallback
+	scanType                     int
+
+	nextCleanup time.Time
 }
 
 func New(logger *logrus.Entry, ctrl *hci.Controller, config BLEScannerConfig) *BLEScanner {
@@ -45,13 +47,25 @@ func New(logger *logrus.Entry, ctrl *hci.Controller, config BLEScannerConfig) *B
 	return e
 }
 
-func (s *BLEScanner) configureScan(active bool) error {
+func (s *BLEScanner) configureScan(scanType int, durationMs int) error {
+	s.Lock()
+	s.scanType = scanType
+	s.Unlock()
+
 	if s.logger != nil {
-		if active {
-			s.logger.Info("Starting active scan")
-		} else {
-			s.logger.Info("Starting passive scan")
+		str := ""
+		switch scanType {
+		case -1:
+			str = "Stopping scan"
+		case 1:
+			str = "Starting active scan"
+		case 0:
+			str = "Starting passive scan"
 		}
+		s.logger.WithFields(logrus.Fields{
+			"0scanType":   scanType,
+			"1durationMs": durationMs,
+		}).Info(str)
 	}
 
 	s.ctrl.Cmds.LESetScanEnableSync(hcicommands.LESetScanEnableInput{
@@ -59,13 +73,17 @@ func (s *BLEScanner) configureScan(active bool) error {
 		FilterDuplicates: 0,
 	})
 
+	if scanType < 0 {
+		return nil
+	}
+
 	params := hcicommands.LESetScanParametersInput{
 		LEScanInterval:       16,
 		LEScanWindow:         16,
 		OwnAddressType:       0,
 		ScanningFilterPolicy: 0,
 	}
-	if active {
+	if scanType >= 1 {
 		params.LEScanType = 1
 	}
 	err := s.ctrl.Cmds.LESetScanParametersSync(params)
@@ -94,13 +112,14 @@ func (s *BLEScanner) Run() error {
 	}
 
 	if s.config.ScanCycleActiveDuty <= 0 {
-		err = s.configureScan(false)
+		err = s.configureScan(0, -1)
 	} else if s.config.ScanCycleActiveDuty >= 1 {
-		err = s.configureScan(true)
+		err = s.configureScan(1, -1)
 	} else {
 		timer := time.NewTimer(0)
 		defer timer.Stop()
-		active := true
+
+		active := 1
 		for {
 			select {
 			case <-timer.C:
@@ -109,18 +128,19 @@ func (s *BLEScanner) Run() error {
 			}
 
 			dutycycle := s.config.ScanCycleActiveDuty
-			if !active {
+			if active == 0 {
 				dutycycle = 1 - dutycycle
 			}
-			durationCycle := dutycycle * float32(bleutil.RandomRange(2*s.config.ScanCycleDurationMs/3, 4*s.config.ScanCycleDurationMs/3))
-			timer.Reset(time.Duration(durationCycle) * time.Millisecond)
+			duration := dutycycle * float32(bleutil.RandomRange(2*s.config.ScanCycleDurationMs/3, 4*s.config.ScanCycleDurationMs/3))
+			timer.Reset(time.Duration(duration) * time.Millisecond)
 
-			err := s.configureScan(active)
+			err := s.configureScan(active, int(duration))
 			if err != nil {
 				return err
 			}
 
-			active = !active
+			active = 1 - active
+			s.handleTimeout()
 		}
 	}
 
@@ -149,20 +169,9 @@ func (s *BLEScanner) SetManufacturerSpecificCallback(id uint16, cb GAPCallback) 
 	}
 }
 
-func (s *BLEScanner) StringSummary() string {
-	devices := s.KnownDevicesAddresses()
-	sort.SliceStable(devices, func(i, j int) bool {
-		return devices[i].IsLess(devices[j])
-	})
+func (s *BLEScanner) GetScanType() int {
+	s.RLock()
+	defer s.RUnlock()
 
-	result := ""
-	for _, m := range devices {
-		dev := s.GetDevice(m)
-		if dev != nil {
-			result += dev.StringSummary() + "\n\n"
-			dev.Release()
-		}
-	}
-
-	return result
+	return s.scanType
 }

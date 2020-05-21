@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>BLE Scanner Monitor</title>
+<script>
+function sanitize(string) {
+	const map = {
+		'&': '&amp;',
+		'<': '&lt;',
+		'>': '&gt;',
+		'"': '&quot;',
+		"'": '&#x27;',
+		"/": '&#x2F;',
+	};
+	const reg = /[&<>"'/]/ig;
+	return string.replace(reg, (match)=>(map[match]));
+}
+
+function padStringEnd(str, len){
+	for(i=str.length; i<len; i++){
+		str+="&nbsp;";
+	}
+	return str
+}
+
+function scanToHTML(scan){
+	result = "StackTime="+padStringEnd(scan.Now.toString(10),14)+" ScanType="+ padStringEnd(scan.ScanType,8);
+        
+	if (scan.Devices != null) {
+		result += " KnownDevices="+scan.Devices.length + "<p>Devices:";
+		scan.Devices.forEach(e => {
+			result += "<br>&nbsp;"+e.Address+": Flags="+e.Flags.toString(16).padStart(2,'0')+" Connectable="+e.Connectable + " RSSI="+padStringEnd(e.RSSI+"dBm", 7)+" LastSeen="+padStringEnd(e.LastSeenMs+"ms", 7)+" Name=\""+sanitize(e.Name)+"\"";
+			if (e.Services != null){
+				result += "<br>&nbsp;&nbsp;Services: "
+				e.Services.forEach(s => {
+					result += s+" ";
+				});
+			}
+			if (e.GAP != null){
+				result += "<br>&nbsp;&nbsp;GAP Data: "
+				e.GAP.forEach(g => {
+					result += "<br>&nbsp;&nbsp;&nbsp;"+g.GAPType.toString(16).padStart(2,'0')+": "+padStringEnd(g.EventType,15)+" "+g.Payload;
+				});
+			}
+			result += "<br>";
+});
+	}
+	return result;
+}
+
+function doRequest(){
+	var xhr = new XMLHttpRequest();
+	xhr.onreadystatechange = function() {
+		if (this.readyState == 4) {
+			if (this.status == 200){
+				document.getElementById("data").innerHTML = scanToHTML(JSON.parse(xhr.responseText));
+			}
+			setTimeout(doRequest, 500+Math.floor(Math.random()*500));
+		}
+	};
+	xhr.open("GET", "/ble/scan", true);
+	xhr.send();
+}
+</script>
+</head>
+<body onload="doRequest()">
+<div style="font-family: monospace, monospace;">
+<h3>BLE Scanner Monitor:</h3>
+<div id="data"></div>
+</div>
+</body>
+</html>

@@ -290,6 +290,8 @@ EOF
 
         my $subeventStr = sprintf("%02X", $subevent);
         my $dlevel = "Debug";
+
+        #Reduce some ultra frequent events to trace priority
         if ($event eq "CommandCompleteEvent" || $event eq "CommandStatusEvent" || $event eq "LEAdvertisingReportEvent"){
             $dlevel = "Trace";
         }

@@ -3,6 +3,7 @@ package hcicmdmgr
 import (
 	"sync"
 
+	"github.com/BertoldVdb/go-misc/closeflag"
 	"github.com/sirupsen/logrus"
 )
 
@@ -13,7 +14,7 @@ type CommandManager struct {
 	logger *logrus.Entry
 	sync.Mutex
 
-	closed bool
+	closeFlag closeflag.CloseFlag
 
 	commandMaxIssue        int
 	commandMaxIssueChanged chan (struct{})
@@ -31,6 +32,9 @@ func New(logger *logrus.Entry, maxSlots []int, awaitStartup bool, tx TransmitCal
 
 	s.commandMaxIssueChanged = make(chan (struct{}), 1)
 
+	/* Normally the device sends an event when it is done booting, but depending on system configuration
+	   this may never be received. If awaitStartup is false we assume the device is ready at start.
+	   Some devices also don't send it at all, instead requiring a fixed delay after power up. */
 	if !awaitStartup {
 		s.commandMaxIssue = 1
 	}
@@ -67,18 +71,9 @@ func (s *CommandManager) Run() error {
 }
 
 func (s *CommandManager) Close() {
-	s.Lock()
-
-	if s.closed {
-		s.Unlock()
-		return
-	}
-	s.closed = true
-	s.Unlock()
-
-	close(s.commandMaxIssueChanged)
-
-	for i := range s.queues {
-		s.queues[i].closeQueue()
+	if s.closeFlag.Close() == nil {
+		for i := range s.queues {
+			s.queues[i].closeQueue()
+		}
 	}
 }

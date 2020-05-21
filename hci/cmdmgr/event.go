@@ -14,12 +14,10 @@ func (s *CommandManager) updateIssueList(numCommands int) {
 
 	s.Lock()
 	debugOldMaxIssue := s.commandMaxIssue
-	if !s.closed {
-		s.commandMaxIssue = numCommands
-		select {
-		case s.commandMaxIssueChanged <- struct{}{}:
-		default:
-		}
+	s.commandMaxIssue = numCommands
+	select {
+	case s.commandMaxIssueChanged <- struct{}{}:
+	default:
 	}
 	s.Unlock()
 
