@@ -3779,8 +3779,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.inquiryCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.inquiryCompleteEvent).Debug("InquiryCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.inquiryCompleteEvent).Trace("InquiryCompleteEvent decoded")
 				}
 				e.inquiryCompleteEvent = cb(e.inquiryCompleteEvent)
 			}
@@ -3800,8 +3800,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.inquiryResultEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.inquiryResultEvent).Debug("InquiryResultEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.inquiryResultEvent).Trace("InquiryResultEvent decoded")
 				}
 				e.inquiryResultEvent = cb(e.inquiryResultEvent)
 			}
@@ -3821,8 +3821,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.connectionCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.connectionCompleteEvent).Debug("ConnectionCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.connectionCompleteEvent).Trace("ConnectionCompleteEvent decoded")
 				}
 				e.connectionCompleteEvent = cb(e.connectionCompleteEvent)
 			}
@@ -3842,8 +3842,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.connectionRequestEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.connectionRequestEvent).Debug("ConnectionRequestEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.connectionRequestEvent).Trace("ConnectionRequestEvent decoded")
 				}
 				e.connectionRequestEvent = cb(e.connectionRequestEvent)
 			}
@@ -3863,8 +3863,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.disconnectionCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.disconnectionCompleteEvent).Debug("DisconnectionCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.disconnectionCompleteEvent).Trace("DisconnectionCompleteEvent decoded")
 				}
 				e.disconnectionCompleteEvent = cb(e.disconnectionCompleteEvent)
 			}
@@ -3884,8 +3884,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.authenticationCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.authenticationCompleteEvent).Debug("AuthenticationCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.authenticationCompleteEvent).Trace("AuthenticationCompleteEvent decoded")
 				}
 				e.authenticationCompleteEvent = cb(e.authenticationCompleteEvent)
 			}
@@ -3905,8 +3905,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.remoteNameRequestCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.remoteNameRequestCompleteEvent).Debug("RemoteNameRequestCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.remoteNameRequestCompleteEvent).Trace("RemoteNameRequestCompleteEvent decoded")
 				}
 				e.remoteNameRequestCompleteEvent = cb(e.remoteNameRequestCompleteEvent)
 			}
@@ -3926,8 +3926,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.encryptionChangeEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.encryptionChangeEvent).Debug("EncryptionChangeEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.encryptionChangeEvent).Trace("EncryptionChangeEvent decoded")
 				}
 				e.encryptionChangeEvent = cb(e.encryptionChangeEvent)
 			}
@@ -3947,8 +3947,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.changeConnectionLinkKeyCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.changeConnectionLinkKeyCompleteEvent).Debug("ChangeConnectionLinkKeyCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.changeConnectionLinkKeyCompleteEvent).Trace("ChangeConnectionLinkKeyCompleteEvent decoded")
 				}
 				e.changeConnectionLinkKeyCompleteEvent = cb(e.changeConnectionLinkKeyCompleteEvent)
 			}
@@ -3968,8 +3968,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.masterLinkKeyCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.masterLinkKeyCompleteEvent).Debug("MasterLinkKeyCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.masterLinkKeyCompleteEvent).Trace("MasterLinkKeyCompleteEvent decoded")
 				}
 				e.masterLinkKeyCompleteEvent = cb(e.masterLinkKeyCompleteEvent)
 			}
@@ -3989,8 +3989,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.readRemoteSupportedFeaturesCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.readRemoteSupportedFeaturesCompleteEvent).Debug("ReadRemoteSupportedFeaturesCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.readRemoteSupportedFeaturesCompleteEvent).Trace("ReadRemoteSupportedFeaturesCompleteEvent decoded")
 				}
 				e.readRemoteSupportedFeaturesCompleteEvent = cb(e.readRemoteSupportedFeaturesCompleteEvent)
 			}
@@ -4010,8 +4010,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.readRemoteVersionInformationCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.readRemoteVersionInformationCompleteEvent).Debug("ReadRemoteVersionInformationCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.readRemoteVersionInformationCompleteEvent).Trace("ReadRemoteVersionInformationCompleteEvent decoded")
 				}
 				e.readRemoteVersionInformationCompleteEvent = cb(e.readRemoteVersionInformationCompleteEvent)
 			}
@@ -4031,8 +4031,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.qoSSetupCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.qoSSetupCompleteEvent).Debug("QoSSetupCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.qoSSetupCompleteEvent).Trace("QoSSetupCompleteEvent decoded")
 				}
 				e.qoSSetupCompleteEvent = cb(e.qoSSetupCompleteEvent)
 			}
@@ -4094,8 +4094,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.hardwareErrorEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.hardwareErrorEvent).Debug("HardwareErrorEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.hardwareErrorEvent).Trace("HardwareErrorEvent decoded")
 				}
 				e.hardwareErrorEvent = cb(e.hardwareErrorEvent)
 			}
@@ -4115,8 +4115,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.flushOccurredEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.flushOccurredEvent).Debug("FlushOccurredEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.flushOccurredEvent).Trace("FlushOccurredEvent decoded")
 				}
 				e.flushOccurredEvent = cb(e.flushOccurredEvent)
 			}
@@ -4136,8 +4136,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.roleChangeEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.roleChangeEvent).Debug("RoleChangeEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.roleChangeEvent).Trace("RoleChangeEvent decoded")
 				}
 				e.roleChangeEvent = cb(e.roleChangeEvent)
 			}
@@ -4157,8 +4157,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.numberOfCompletedPacketsEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.numberOfCompletedPacketsEvent).Debug("NumberOfCompletedPacketsEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.numberOfCompletedPacketsEvent).Trace("NumberOfCompletedPacketsEvent decoded")
 				}
 				e.numberOfCompletedPacketsEvent = cb(e.numberOfCompletedPacketsEvent)
 			}
@@ -4178,8 +4178,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.modeChangeEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.modeChangeEvent).Debug("ModeChangeEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.modeChangeEvent).Trace("ModeChangeEvent decoded")
 				}
 				e.modeChangeEvent = cb(e.modeChangeEvent)
 			}
@@ -4199,8 +4199,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.returnLinkKeysEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.returnLinkKeysEvent).Debug("ReturnLinkKeysEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.returnLinkKeysEvent).Trace("ReturnLinkKeysEvent decoded")
 				}
 				e.returnLinkKeysEvent = cb(e.returnLinkKeysEvent)
 			}
@@ -4220,8 +4220,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.pINCodeRequestEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.pINCodeRequestEvent).Debug("PINCodeRequestEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.pINCodeRequestEvent).Trace("PINCodeRequestEvent decoded")
 				}
 				e.pINCodeRequestEvent = cb(e.pINCodeRequestEvent)
 			}
@@ -4241,8 +4241,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.linkKeyRequestEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.linkKeyRequestEvent).Debug("LinkKeyRequestEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.linkKeyRequestEvent).Trace("LinkKeyRequestEvent decoded")
 				}
 				e.linkKeyRequestEvent = cb(e.linkKeyRequestEvent)
 			}
@@ -4262,8 +4262,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.linkKeyNotificationEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.linkKeyNotificationEvent).Debug("LinkKeyNotificationEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.linkKeyNotificationEvent).Trace("LinkKeyNotificationEvent decoded")
 				}
 				e.linkKeyNotificationEvent = cb(e.linkKeyNotificationEvent)
 			}
@@ -4283,8 +4283,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.loopbackCommandEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.loopbackCommandEvent).Debug("LoopbackCommandEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.loopbackCommandEvent).Trace("LoopbackCommandEvent decoded")
 				}
 				e.loopbackCommandEvent = cb(e.loopbackCommandEvent)
 			}
@@ -4304,8 +4304,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.dataBufferOverflowEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.dataBufferOverflowEvent).Debug("DataBufferOverflowEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.dataBufferOverflowEvent).Trace("DataBufferOverflowEvent decoded")
 				}
 				e.dataBufferOverflowEvent = cb(e.dataBufferOverflowEvent)
 			}
@@ -4325,8 +4325,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.maxSlotsChangeEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.maxSlotsChangeEvent).Debug("MaxSlotsChangeEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.maxSlotsChangeEvent).Trace("MaxSlotsChangeEvent decoded")
 				}
 				e.maxSlotsChangeEvent = cb(e.maxSlotsChangeEvent)
 			}
@@ -4346,8 +4346,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.readClockOffsetCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.readClockOffsetCompleteEvent).Debug("ReadClockOffsetCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.readClockOffsetCompleteEvent).Trace("ReadClockOffsetCompleteEvent decoded")
 				}
 				e.readClockOffsetCompleteEvent = cb(e.readClockOffsetCompleteEvent)
 			}
@@ -4367,8 +4367,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.connectionPacketTypeChangedEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.connectionPacketTypeChangedEvent).Debug("ConnectionPacketTypeChangedEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.connectionPacketTypeChangedEvent).Trace("ConnectionPacketTypeChangedEvent decoded")
 				}
 				e.connectionPacketTypeChangedEvent = cb(e.connectionPacketTypeChangedEvent)
 			}
@@ -4388,8 +4388,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.qoSViolationEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.qoSViolationEvent).Debug("QoSViolationEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.qoSViolationEvent).Trace("QoSViolationEvent decoded")
 				}
 				e.qoSViolationEvent = cb(e.qoSViolationEvent)
 			}
@@ -4409,8 +4409,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.pageScanRepetitionModeChangeEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.pageScanRepetitionModeChangeEvent).Debug("PageScanRepetitionModeChangeEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.pageScanRepetitionModeChangeEvent).Trace("PageScanRepetitionModeChangeEvent decoded")
 				}
 				e.pageScanRepetitionModeChangeEvent = cb(e.pageScanRepetitionModeChangeEvent)
 			}
@@ -4430,8 +4430,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.flowSpecificationCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.flowSpecificationCompleteEvent).Debug("FlowSpecificationCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.flowSpecificationCompleteEvent).Trace("FlowSpecificationCompleteEvent decoded")
 				}
 				e.flowSpecificationCompleteEvent = cb(e.flowSpecificationCompleteEvent)
 			}
@@ -4451,8 +4451,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.inquiryResultwithRSSIEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.inquiryResultwithRSSIEvent).Debug("InquiryResultwithRSSIEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.inquiryResultwithRSSIEvent).Trace("InquiryResultwithRSSIEvent decoded")
 				}
 				e.inquiryResultwithRSSIEvent = cb(e.inquiryResultwithRSSIEvent)
 			}
@@ -4472,8 +4472,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.readRemoteExtendedFeaturesCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.readRemoteExtendedFeaturesCompleteEvent).Debug("ReadRemoteExtendedFeaturesCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.readRemoteExtendedFeaturesCompleteEvent).Trace("ReadRemoteExtendedFeaturesCompleteEvent decoded")
 				}
 				e.readRemoteExtendedFeaturesCompleteEvent = cb(e.readRemoteExtendedFeaturesCompleteEvent)
 			}
@@ -4493,8 +4493,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.synchronousConnectionCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.synchronousConnectionCompleteEvent).Debug("SynchronousConnectionCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.synchronousConnectionCompleteEvent).Trace("SynchronousConnectionCompleteEvent decoded")
 				}
 				e.synchronousConnectionCompleteEvent = cb(e.synchronousConnectionCompleteEvent)
 			}
@@ -4514,8 +4514,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.synchronousConnectionChangedEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.synchronousConnectionChangedEvent).Debug("SynchronousConnectionChangedEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.synchronousConnectionChangedEvent).Trace("SynchronousConnectionChangedEvent decoded")
 				}
 				e.synchronousConnectionChangedEvent = cb(e.synchronousConnectionChangedEvent)
 			}
@@ -4535,8 +4535,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.sniffSubratingEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.sniffSubratingEvent).Debug("SniffSubratingEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.sniffSubratingEvent).Trace("SniffSubratingEvent decoded")
 				}
 				e.sniffSubratingEvent = cb(e.sniffSubratingEvent)
 			}
@@ -4556,8 +4556,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.extendedInquiryResultEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.extendedInquiryResultEvent).Debug("ExtendedInquiryResultEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.extendedInquiryResultEvent).Trace("ExtendedInquiryResultEvent decoded")
 				}
 				e.extendedInquiryResultEvent = cb(e.extendedInquiryResultEvent)
 			}
@@ -4577,8 +4577,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.encryptionKeyRefreshCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.encryptionKeyRefreshCompleteEvent).Debug("EncryptionKeyRefreshCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.encryptionKeyRefreshCompleteEvent).Trace("EncryptionKeyRefreshCompleteEvent decoded")
 				}
 				e.encryptionKeyRefreshCompleteEvent = cb(e.encryptionKeyRefreshCompleteEvent)
 			}
@@ -4598,8 +4598,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.iOCapabilityRequestEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.iOCapabilityRequestEvent).Debug("IOCapabilityRequestEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.iOCapabilityRequestEvent).Trace("IOCapabilityRequestEvent decoded")
 				}
 				e.iOCapabilityRequestEvent = cb(e.iOCapabilityRequestEvent)
 			}
@@ -4619,8 +4619,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.iOCapabilityResponseEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.iOCapabilityResponseEvent).Debug("IOCapabilityResponseEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.iOCapabilityResponseEvent).Trace("IOCapabilityResponseEvent decoded")
 				}
 				e.iOCapabilityResponseEvent = cb(e.iOCapabilityResponseEvent)
 			}
@@ -4640,8 +4640,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.userConfirmationRequestEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.userConfirmationRequestEvent).Debug("UserConfirmationRequestEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.userConfirmationRequestEvent).Trace("UserConfirmationRequestEvent decoded")
 				}
 				e.userConfirmationRequestEvent = cb(e.userConfirmationRequestEvent)
 			}
@@ -4661,8 +4661,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.userPasskeyRequestEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.userPasskeyRequestEvent).Debug("UserPasskeyRequestEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.userPasskeyRequestEvent).Trace("UserPasskeyRequestEvent decoded")
 				}
 				e.userPasskeyRequestEvent = cb(e.userPasskeyRequestEvent)
 			}
@@ -4682,8 +4682,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.remoteOOBDataRequestEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.remoteOOBDataRequestEvent).Debug("RemoteOOBDataRequestEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.remoteOOBDataRequestEvent).Trace("RemoteOOBDataRequestEvent decoded")
 				}
 				e.remoteOOBDataRequestEvent = cb(e.remoteOOBDataRequestEvent)
 			}
@@ -4703,8 +4703,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.simplePairingCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.simplePairingCompleteEvent).Debug("SimplePairingCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.simplePairingCompleteEvent).Trace("SimplePairingCompleteEvent decoded")
 				}
 				e.simplePairingCompleteEvent = cb(e.simplePairingCompleteEvent)
 			}
@@ -4724,8 +4724,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.linkSupervisionTimeoutChangedEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.linkSupervisionTimeoutChangedEvent).Debug("LinkSupervisionTimeoutChangedEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.linkSupervisionTimeoutChangedEvent).Trace("LinkSupervisionTimeoutChangedEvent decoded")
 				}
 				e.linkSupervisionTimeoutChangedEvent = cb(e.linkSupervisionTimeoutChangedEvent)
 			}
@@ -4745,8 +4745,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.enhancedFlushCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.enhancedFlushCompleteEvent).Debug("EnhancedFlushCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.enhancedFlushCompleteEvent).Trace("EnhancedFlushCompleteEvent decoded")
 				}
 				e.enhancedFlushCompleteEvent = cb(e.enhancedFlushCompleteEvent)
 			}
@@ -4766,8 +4766,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.userPasskeyNotificationEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.userPasskeyNotificationEvent).Debug("UserPasskeyNotificationEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.userPasskeyNotificationEvent).Trace("UserPasskeyNotificationEvent decoded")
 				}
 				e.userPasskeyNotificationEvent = cb(e.userPasskeyNotificationEvent)
 			}
@@ -4787,8 +4787,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.keypressNotificationEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.keypressNotificationEvent).Debug("KeypressNotificationEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.keypressNotificationEvent).Trace("KeypressNotificationEvent decoded")
 				}
 				e.keypressNotificationEvent = cb(e.keypressNotificationEvent)
 			}
@@ -4808,8 +4808,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.remoteHostSupportedFeaturesNotificationEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.remoteHostSupportedFeaturesNotificationEvent).Debug("RemoteHostSupportedFeaturesNotificationEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.remoteHostSupportedFeaturesNotificationEvent).Trace("RemoteHostSupportedFeaturesNotificationEvent decoded")
 				}
 				e.remoteHostSupportedFeaturesNotificationEvent = cb(e.remoteHostSupportedFeaturesNotificationEvent)
 			}
@@ -4829,8 +4829,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.physicalLinkCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.physicalLinkCompleteEvent).Debug("PhysicalLinkCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.physicalLinkCompleteEvent).Trace("PhysicalLinkCompleteEvent decoded")
 				}
 				e.physicalLinkCompleteEvent = cb(e.physicalLinkCompleteEvent)
 			}
@@ -4850,8 +4850,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.channelSelectedEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.channelSelectedEvent).Debug("ChannelSelectedEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.channelSelectedEvent).Trace("ChannelSelectedEvent decoded")
 				}
 				e.channelSelectedEvent = cb(e.channelSelectedEvent)
 			}
@@ -4871,8 +4871,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.disconnectionPhysicalLinkCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.disconnectionPhysicalLinkCompleteEvent).Debug("DisconnectionPhysicalLinkCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.disconnectionPhysicalLinkCompleteEvent).Trace("DisconnectionPhysicalLinkCompleteEvent decoded")
 				}
 				e.disconnectionPhysicalLinkCompleteEvent = cb(e.disconnectionPhysicalLinkCompleteEvent)
 			}
@@ -4892,8 +4892,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.physicalLinkLossEarlyWarningEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.physicalLinkLossEarlyWarningEvent).Debug("PhysicalLinkLossEarlyWarningEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.physicalLinkLossEarlyWarningEvent).Trace("PhysicalLinkLossEarlyWarningEvent decoded")
 				}
 				e.physicalLinkLossEarlyWarningEvent = cb(e.physicalLinkLossEarlyWarningEvent)
 			}
@@ -4913,8 +4913,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.physicalLinkRecoveryEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.physicalLinkRecoveryEvent).Debug("PhysicalLinkRecoveryEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.physicalLinkRecoveryEvent).Trace("PhysicalLinkRecoveryEvent decoded")
 				}
 				e.physicalLinkRecoveryEvent = cb(e.physicalLinkRecoveryEvent)
 			}
@@ -4934,8 +4934,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.logicalLinkCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.logicalLinkCompleteEvent).Debug("LogicalLinkCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.logicalLinkCompleteEvent).Trace("LogicalLinkCompleteEvent decoded")
 				}
 				e.logicalLinkCompleteEvent = cb(e.logicalLinkCompleteEvent)
 			}
@@ -4955,8 +4955,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.disconnectionLogicalLinkCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.disconnectionLogicalLinkCompleteEvent).Debug("DisconnectionLogicalLinkCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.disconnectionLogicalLinkCompleteEvent).Trace("DisconnectionLogicalLinkCompleteEvent decoded")
 				}
 				e.disconnectionLogicalLinkCompleteEvent = cb(e.disconnectionLogicalLinkCompleteEvent)
 			}
@@ -4976,8 +4976,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.flowSpecModifyCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.flowSpecModifyCompleteEvent).Debug("FlowSpecModifyCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.flowSpecModifyCompleteEvent).Trace("FlowSpecModifyCompleteEvent decoded")
 				}
 				e.flowSpecModifyCompleteEvent = cb(e.flowSpecModifyCompleteEvent)
 			}
@@ -4997,8 +4997,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.numberOfCompletedDataBlocksEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.numberOfCompletedDataBlocksEvent).Debug("NumberOfCompletedDataBlocksEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.numberOfCompletedDataBlocksEvent).Trace("NumberOfCompletedDataBlocksEvent decoded")
 				}
 				e.numberOfCompletedDataBlocksEvent = cb(e.numberOfCompletedDataBlocksEvent)
 			}
@@ -5018,8 +5018,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.shortRangeModeChangeCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.shortRangeModeChangeCompleteEvent).Debug("ShortRangeModeChangeCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.shortRangeModeChangeCompleteEvent).Trace("ShortRangeModeChangeCompleteEvent decoded")
 				}
 				e.shortRangeModeChangeCompleteEvent = cb(e.shortRangeModeChangeCompleteEvent)
 			}
@@ -5039,8 +5039,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.aMPStatusChangeEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.aMPStatusChangeEvent).Debug("AMPStatusChangeEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.aMPStatusChangeEvent).Trace("AMPStatusChangeEvent decoded")
 				}
 				e.aMPStatusChangeEvent = cb(e.aMPStatusChangeEvent)
 			}
@@ -5060,8 +5060,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.aMPStartTestEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.aMPStartTestEvent).Debug("AMPStartTestEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.aMPStartTestEvent).Trace("AMPStartTestEvent decoded")
 				}
 				e.aMPStartTestEvent = cb(e.aMPStartTestEvent)
 			}
@@ -5081,8 +5081,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.aMPTestEndEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.aMPTestEndEvent).Debug("AMPTestEndEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.aMPTestEndEvent).Trace("AMPTestEndEvent decoded")
 				}
 				e.aMPTestEndEvent = cb(e.aMPTestEndEvent)
 			}
@@ -5102,8 +5102,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.aMPReceiverReportEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.aMPReceiverReportEvent).Debug("AMPReceiverReportEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.aMPReceiverReportEvent).Trace("AMPReceiverReportEvent decoded")
 				}
 				e.aMPReceiverReportEvent = cb(e.aMPReceiverReportEvent)
 			}
@@ -5123,8 +5123,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEConnectionCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEConnectionCompleteEvent).Debug("LEConnectionCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEConnectionCompleteEvent).Trace("LEConnectionCompleteEvent decoded")
 				}
 				e.lEConnectionCompleteEvent = cb(e.lEConnectionCompleteEvent)
 			}
@@ -5165,8 +5165,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEConnectionUpdateCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEConnectionUpdateCompleteEvent).Debug("LEConnectionUpdateCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEConnectionUpdateCompleteEvent).Trace("LEConnectionUpdateCompleteEvent decoded")
 				}
 				e.lEConnectionUpdateCompleteEvent = cb(e.lEConnectionUpdateCompleteEvent)
 			}
@@ -5186,8 +5186,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEReadRemoteFeaturesCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEReadRemoteFeaturesCompleteEvent).Debug("LEReadRemoteFeaturesCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEReadRemoteFeaturesCompleteEvent).Trace("LEReadRemoteFeaturesCompleteEvent decoded")
 				}
 				e.lEReadRemoteFeaturesCompleteEvent = cb(e.lEReadRemoteFeaturesCompleteEvent)
 			}
@@ -5207,8 +5207,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lELongTermKeyRequestEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lELongTermKeyRequestEvent).Debug("LELongTermKeyRequestEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lELongTermKeyRequestEvent).Trace("LELongTermKeyRequestEvent decoded")
 				}
 				e.lELongTermKeyRequestEvent = cb(e.lELongTermKeyRequestEvent)
 			}
@@ -5228,8 +5228,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lERemoteConnectionParameterRequestEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lERemoteConnectionParameterRequestEvent).Debug("LERemoteConnectionParameterRequestEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lERemoteConnectionParameterRequestEvent).Trace("LERemoteConnectionParameterRequestEvent decoded")
 				}
 				e.lERemoteConnectionParameterRequestEvent = cb(e.lERemoteConnectionParameterRequestEvent)
 			}
@@ -5249,8 +5249,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEDataLengthChangeEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEDataLengthChangeEvent).Debug("LEDataLengthChangeEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEDataLengthChangeEvent).Trace("LEDataLengthChangeEvent decoded")
 				}
 				e.lEDataLengthChangeEvent = cb(e.lEDataLengthChangeEvent)
 			}
@@ -5270,8 +5270,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEReadLocalP256PublicKeyCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEReadLocalP256PublicKeyCompleteEvent).Debug("LEReadLocalP256PublicKeyCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEReadLocalP256PublicKeyCompleteEvent).Trace("LEReadLocalP256PublicKeyCompleteEvent decoded")
 				}
 				e.lEReadLocalP256PublicKeyCompleteEvent = cb(e.lEReadLocalP256PublicKeyCompleteEvent)
 			}
@@ -5291,8 +5291,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEGenerateDHKeyCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEGenerateDHKeyCompleteEvent).Debug("LEGenerateDHKeyCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEGenerateDHKeyCompleteEvent).Trace("LEGenerateDHKeyCompleteEvent decoded")
 				}
 				e.lEGenerateDHKeyCompleteEvent = cb(e.lEGenerateDHKeyCompleteEvent)
 			}
@@ -5312,8 +5312,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEEnhancedConnectionCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEEnhancedConnectionCompleteEvent).Debug("LEEnhancedConnectionCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEEnhancedConnectionCompleteEvent).Trace("LEEnhancedConnectionCompleteEvent decoded")
 				}
 				e.lEEnhancedConnectionCompleteEvent = cb(e.lEEnhancedConnectionCompleteEvent)
 			}
@@ -5333,8 +5333,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEDirectedAdvertisingReportEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEDirectedAdvertisingReportEvent).Debug("LEDirectedAdvertisingReportEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEDirectedAdvertisingReportEvent).Trace("LEDirectedAdvertisingReportEvent decoded")
 				}
 				e.lEDirectedAdvertisingReportEvent = cb(e.lEDirectedAdvertisingReportEvent)
 			}
@@ -5354,8 +5354,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEPHYUpdateCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEPHYUpdateCompleteEvent).Debug("LEPHYUpdateCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEPHYUpdateCompleteEvent).Trace("LEPHYUpdateCompleteEvent decoded")
 				}
 				e.lEPHYUpdateCompleteEvent = cb(e.lEPHYUpdateCompleteEvent)
 			}
@@ -5375,8 +5375,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEExtendedAdvertisingReportEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEExtendedAdvertisingReportEvent).Debug("LEExtendedAdvertisingReportEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEExtendedAdvertisingReportEvent).Trace("LEExtendedAdvertisingReportEvent decoded")
 				}
 				e.lEExtendedAdvertisingReportEvent = cb(e.lEExtendedAdvertisingReportEvent)
 			}
@@ -5396,8 +5396,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEPeriodicAdvertisingSyncEstablishedEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEPeriodicAdvertisingSyncEstablishedEvent).Debug("LEPeriodicAdvertisingSyncEstablishedEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEPeriodicAdvertisingSyncEstablishedEvent).Trace("LEPeriodicAdvertisingSyncEstablishedEvent decoded")
 				}
 				e.lEPeriodicAdvertisingSyncEstablishedEvent = cb(e.lEPeriodicAdvertisingSyncEstablishedEvent)
 			}
@@ -5417,8 +5417,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEPeriodicAdvertisingReportEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEPeriodicAdvertisingReportEvent).Debug("LEPeriodicAdvertisingReportEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEPeriodicAdvertisingReportEvent).Trace("LEPeriodicAdvertisingReportEvent decoded")
 				}
 				e.lEPeriodicAdvertisingReportEvent = cb(e.lEPeriodicAdvertisingReportEvent)
 			}
@@ -5438,8 +5438,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEPeriodicAdvertisingSyncLostEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEPeriodicAdvertisingSyncLostEvent).Debug("LEPeriodicAdvertisingSyncLostEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEPeriodicAdvertisingSyncLostEvent).Trace("LEPeriodicAdvertisingSyncLostEvent decoded")
 				}
 				e.lEPeriodicAdvertisingSyncLostEvent = cb(e.lEPeriodicAdvertisingSyncLostEvent)
 			}
@@ -5459,8 +5459,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEScanTimeoutEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEScanTimeoutEvent).Debug("LEScanTimeoutEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEScanTimeoutEvent).Trace("LEScanTimeoutEvent decoded")
 				}
 				e.lEScanTimeoutEvent = cb(e.lEScanTimeoutEvent)
 			}
@@ -5480,8 +5480,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEAdvertisingSetTerminatedEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEAdvertisingSetTerminatedEvent).Debug("LEAdvertisingSetTerminatedEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEAdvertisingSetTerminatedEvent).Trace("LEAdvertisingSetTerminatedEvent decoded")
 				}
 				e.lEAdvertisingSetTerminatedEvent = cb(e.lEAdvertisingSetTerminatedEvent)
 			}
@@ -5501,8 +5501,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEScanRequestReceivedEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEScanRequestReceivedEvent).Debug("LEScanRequestReceivedEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEScanRequestReceivedEvent).Trace("LEScanRequestReceivedEvent decoded")
 				}
 				e.lEScanRequestReceivedEvent = cb(e.lEScanRequestReceivedEvent)
 			}
@@ -5522,8 +5522,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEChannelSelectionAlgorithmEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEChannelSelectionAlgorithmEvent).Debug("LEChannelSelectionAlgorithmEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEChannelSelectionAlgorithmEvent).Trace("LEChannelSelectionAlgorithmEvent decoded")
 				}
 				e.lEChannelSelectionAlgorithmEvent = cb(e.lEChannelSelectionAlgorithmEvent)
 			}
@@ -5543,8 +5543,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEConnectionlessIQReportEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEConnectionlessIQReportEvent).Debug("LEConnectionlessIQReportEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEConnectionlessIQReportEvent).Trace("LEConnectionlessIQReportEvent decoded")
 				}
 				e.lEConnectionlessIQReportEvent = cb(e.lEConnectionlessIQReportEvent)
 			}
@@ -5564,8 +5564,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEConnectionIQReportEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEConnectionIQReportEvent).Debug("LEConnectionIQReportEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEConnectionIQReportEvent).Trace("LEConnectionIQReportEvent decoded")
 				}
 				e.lEConnectionIQReportEvent = cb(e.lEConnectionIQReportEvent)
 			}
@@ -5585,8 +5585,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lECTERequestFailedEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lECTERequestFailedEvent).Debug("LECTERequestFailedEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lECTERequestFailedEvent).Trace("LECTERequestFailedEvent decoded")
 				}
 				e.lECTERequestFailedEvent = cb(e.lECTERequestFailedEvent)
 			}
@@ -5606,8 +5606,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEPeriodicAdvertisingSyncTransferReceivedEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEPeriodicAdvertisingSyncTransferReceivedEvent).Debug("LEPeriodicAdvertisingSyncTransferReceivedEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEPeriodicAdvertisingSyncTransferReceivedEvent).Trace("LEPeriodicAdvertisingSyncTransferReceivedEvent decoded")
 				}
 				e.lEPeriodicAdvertisingSyncTransferReceivedEvent = cb(e.lEPeriodicAdvertisingSyncTransferReceivedEvent)
 			}
@@ -5627,8 +5627,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lECISEstablishedEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lECISEstablishedEvent).Debug("LECISEstablishedEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lECISEstablishedEvent).Trace("LECISEstablishedEvent decoded")
 				}
 				e.lECISEstablishedEvent = cb(e.lECISEstablishedEvent)
 			}
@@ -5648,8 +5648,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lECISRequestEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lECISRequestEvent).Debug("LECISRequestEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lECISRequestEvent).Trace("LECISRequestEvent decoded")
 				}
 				e.lECISRequestEvent = cb(e.lECISRequestEvent)
 			}
@@ -5669,8 +5669,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lECreateBIGCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lECreateBIGCompleteEvent).Debug("LECreateBIGCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lECreateBIGCompleteEvent).Trace("LECreateBIGCompleteEvent decoded")
 				}
 				e.lECreateBIGCompleteEvent = cb(e.lECreateBIGCompleteEvent)
 			}
@@ -5690,8 +5690,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lETerminateBIGCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lETerminateBIGCompleteEvent).Debug("LETerminateBIGCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lETerminateBIGCompleteEvent).Trace("LETerminateBIGCompleteEvent decoded")
 				}
 				e.lETerminateBIGCompleteEvent = cb(e.lETerminateBIGCompleteEvent)
 			}
@@ -5711,8 +5711,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEBIGSyncEstablishedEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEBIGSyncEstablishedEvent).Debug("LEBIGSyncEstablishedEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEBIGSyncEstablishedEvent).Trace("LEBIGSyncEstablishedEvent decoded")
 				}
 				e.lEBIGSyncEstablishedEvent = cb(e.lEBIGSyncEstablishedEvent)
 			}
@@ -5732,8 +5732,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEBIGSyncLostEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEBIGSyncLostEvent).Debug("LEBIGSyncLostEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEBIGSyncLostEvent).Trace("LEBIGSyncLostEvent decoded")
 				}
 				e.lEBIGSyncLostEvent = cb(e.lEBIGSyncLostEvent)
 			}
@@ -5753,8 +5753,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lERequestPeerSCACompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lERequestPeerSCACompleteEvent).Debug("LERequestPeerSCACompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lERequestPeerSCACompleteEvent).Trace("LERequestPeerSCACompleteEvent decoded")
 				}
 				e.lERequestPeerSCACompleteEvent = cb(e.lERequestPeerSCACompleteEvent)
 			}
@@ -5774,8 +5774,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEPathLossThresholdEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEPathLossThresholdEvent).Debug("LEPathLossThresholdEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEPathLossThresholdEvent).Trace("LEPathLossThresholdEvent decoded")
 				}
 				e.lEPathLossThresholdEvent = cb(e.lEPathLossThresholdEvent)
 			}
@@ -5795,8 +5795,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lETransmitPowerReportingEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lETransmitPowerReportingEvent).Debug("LETransmitPowerReportingEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lETransmitPowerReportingEvent).Trace("LETransmitPowerReportingEvent decoded")
 				}
 				e.lETransmitPowerReportingEvent = cb(e.lETransmitPowerReportingEvent)
 			}
@@ -5816,8 +5816,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.lEBIGInfoAdvertisingReportEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.lEBIGInfoAdvertisingReportEvent).Debug("LEBIGInfoAdvertisingReportEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.lEBIGInfoAdvertisingReportEvent).Trace("LEBIGInfoAdvertisingReportEvent decoded")
 				}
 				e.lEBIGInfoAdvertisingReportEvent = cb(e.lEBIGInfoAdvertisingReportEvent)
 			}
@@ -5837,8 +5837,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.triggeredClockCaptureEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.triggeredClockCaptureEvent).Debug("TriggeredClockCaptureEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.triggeredClockCaptureEvent).Trace("TriggeredClockCaptureEvent decoded")
 				}
 				e.triggeredClockCaptureEvent = cb(e.triggeredClockCaptureEvent)
 			}
@@ -5858,8 +5858,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.synchronizationTrainCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.synchronizationTrainCompleteEvent).Debug("SynchronizationTrainCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.synchronizationTrainCompleteEvent).Trace("SynchronizationTrainCompleteEvent decoded")
 				}
 				e.synchronizationTrainCompleteEvent = cb(e.synchronizationTrainCompleteEvent)
 			}
@@ -5879,8 +5879,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.synchronizationTrainReceivedEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.synchronizationTrainReceivedEvent).Debug("SynchronizationTrainReceivedEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.synchronizationTrainReceivedEvent).Trace("SynchronizationTrainReceivedEvent decoded")
 				}
 				e.synchronizationTrainReceivedEvent = cb(e.synchronizationTrainReceivedEvent)
 			}
@@ -5900,8 +5900,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.connectionlessSlaveBroadcastReceiveEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.connectionlessSlaveBroadcastReceiveEvent).Debug("ConnectionlessSlaveBroadcastReceiveEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.connectionlessSlaveBroadcastReceiveEvent).Trace("ConnectionlessSlaveBroadcastReceiveEvent decoded")
 				}
 				e.connectionlessSlaveBroadcastReceiveEvent = cb(e.connectionlessSlaveBroadcastReceiveEvent)
 			}
@@ -5921,8 +5921,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.connectionlessSlaveBroadcastTimeoutEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.connectionlessSlaveBroadcastTimeoutEvent).Debug("ConnectionlessSlaveBroadcastTimeoutEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.connectionlessSlaveBroadcastTimeoutEvent).Trace("ConnectionlessSlaveBroadcastTimeoutEvent decoded")
 				}
 				e.connectionlessSlaveBroadcastTimeoutEvent = cb(e.connectionlessSlaveBroadcastTimeoutEvent)
 			}
@@ -5942,8 +5942,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.truncatedPageCompleteEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.truncatedPageCompleteEvent).Debug("TruncatedPageCompleteEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.truncatedPageCompleteEvent).Trace("TruncatedPageCompleteEvent decoded")
 				}
 				e.truncatedPageCompleteEvent = cb(e.truncatedPageCompleteEvent)
 			}
@@ -5963,8 +5963,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.slavePageResponseTimeoutEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.slavePageResponseTimeoutEvent).Debug("SlavePageResponseTimeoutEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.slavePageResponseTimeoutEvent).Trace("SlavePageResponseTimeoutEvent decoded")
 				}
 				e.slavePageResponseTimeoutEvent = cb(e.slavePageResponseTimeoutEvent)
 			}
@@ -5984,8 +5984,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.connectionlessSlaveBroadcastChannelMapChangeEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.connectionlessSlaveBroadcastChannelMapChangeEvent).Debug("ConnectionlessSlaveBroadcastChannelMapChangeEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.connectionlessSlaveBroadcastChannelMapChangeEvent).Trace("ConnectionlessSlaveBroadcastChannelMapChangeEvent decoded")
 				}
 				e.connectionlessSlaveBroadcastChannelMapChangeEvent = cb(e.connectionlessSlaveBroadcastChannelMapChangeEvent)
 			}
@@ -6005,8 +6005,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.inquiryResponseNotificationEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.inquiryResponseNotificationEvent).Debug("InquiryResponseNotificationEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.inquiryResponseNotificationEvent).Trace("InquiryResponseNotificationEvent decoded")
 				}
 				e.inquiryResponseNotificationEvent = cb(e.inquiryResponseNotificationEvent)
 			}
@@ -6026,8 +6026,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.authenticatedPayloadTimeoutExpiredEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.authenticatedPayloadTimeoutExpiredEvent).Debug("AuthenticatedPayloadTimeoutExpiredEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.authenticatedPayloadTimeoutExpiredEvent).Trace("AuthenticatedPayloadTimeoutExpiredEvent decoded")
 				}
 				e.authenticatedPayloadTimeoutExpiredEvent = cb(e.authenticatedPayloadTimeoutExpiredEvent)
 			}
@@ -6047,8 +6047,8 @@ func (e *EventHandler) handleEventInternal(eventCode uint16, params []byte) {
 			}
 
 			if e.sAMStatusChangeEvent.decode(params) {
-				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-					e.logger.WithField("0data", e.sAMStatusChangeEvent).Debug("SAMStatusChangeEvent decoded")
+				if e.logger != nil && e.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					e.logger.WithField("0data", e.sAMStatusChangeEvent).Trace("SAMStatusChangeEvent decoded")
 				}
 				e.sAMStatusChangeEvent = cb(e.sAMStatusChangeEvent)
 			}

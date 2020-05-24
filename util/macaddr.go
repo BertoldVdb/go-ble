@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 )
 
@@ -70,7 +69,7 @@ func MacAddrFromStringPanic(mac string) MacAddr {
 	if err != nil {
 		panic(err)
 	}
-	log.Println(mac, addr.String())
+
 	return addr
 }
 

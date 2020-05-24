@@ -1,0 +1,9 @@
+Bluetooth modules with HCI:
+579-BM70BLES1FC2-0B0 5.0 HCIUART(H4, it seems)
+239-453-00005        5.0 HCIUART(program zephyr/nimble in nRF52810)
+347-ISM14585-L35-P8  5.0 HCIUART(needs firmware load, proprietary commands but available without NDA)
+308-BT680F           5.0 HCIUART(H4)
+727-CYBLE-013025-00  5.0 HCIUART(H4, may need firmware/nvram load)
+814-BT851            4.2 HCIUSB (Actual usb stick, cypress chip)
+239-BT820            4.0 HCIUSB (Actual usb stick, csr chip)
+239-451-00004        5.0 HCIUSB (nrf52840, needs firmware load, method unclear, hopefully DFU bootloader for nordic. Better to use nrf52USBSTICK devboard)

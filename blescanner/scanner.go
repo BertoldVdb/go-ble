@@ -23,7 +23,7 @@ type BLEScannerConfig struct {
 type BLEScanner struct {
 	sync.RWMutex
 	logger *logrus.Entry
-	config BLEScannerConfig
+	config *BLEScannerConfig
 	ctrl   *hci.Controller
 	close  closeflag.CloseFlag
 
@@ -35,7 +35,7 @@ type BLEScanner struct {
 	nextCleanup time.Time
 }
 
-func New(logger *logrus.Entry, ctrl *hci.Controller, config BLEScannerConfig) *BLEScanner {
+func New(logger *logrus.Entry, ctrl *hci.Controller, config *BLEScannerConfig) *BLEScanner {
 	e := &BLEScanner{
 		logger:                       logger,
 		config:                       config,
@@ -80,7 +80,7 @@ func (s *BLEScanner) configureScan(scanType int, durationMs int) error {
 	params := hcicommands.LESetScanParametersInput{
 		LEScanInterval:       16,
 		LEScanWindow:         16,
-		OwnAddressType:       0,
+		OwnAddressType:       s.ctrl.GetLERecommenedOwnAddrType(hci.LEAddrUsageScan),
 		ScanningFilterPolicy: 0,
 	}
 	if scanType >= 1 {
@@ -100,6 +100,9 @@ func (s *BLEScanner) configureScan(scanType int, durationMs int) error {
 
 func (s *BLEScanner) Run() error {
 	defer s.Close()
+	defer func() {
+		s.configureScan(-1, -1)
+	}()
 
 	err := s.ctrl.Events.SetLEAdvertisingReportEventCallback(s.handleScanResult)
 	if err != nil {
@@ -144,11 +147,15 @@ func (s *BLEScanner) Run() error {
 		}
 	}
 
+	if err == nil {
+		<-s.close.Chan()
+	}
+
 	return err
 }
 
-func (s *BLEScanner) Close() {
-	s.close.Close()
+func (s *BLEScanner) Close() error {
+	return s.close.Close()
 }
 
 func (s *BLEScanner) RegisterDeviceUpdateCallback(cb DeviceUpdatedCallback) {

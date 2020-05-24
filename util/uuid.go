@@ -14,9 +14,7 @@ var (
 
 func UUIDFromBytes(value []byte) UUID {
 	l := len(value)
-	if l != 2 && l != 4 && l != 16 {
-		panic("Invalid length, needs to be 16, 32 or 128 bits")
-	}
+	Assert(l == 2 || l == 4 || l == 16, "Invalid length, needs to be 16, 32 or 128 bits")
 
 	var result UUID
 

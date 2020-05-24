@@ -15,3 +15,9 @@ func LogWithPrefix(input *logrus.Entry, extra string) *logrus.Entry {
 
 	return input.WithField("prefix", base+extra)
 }
+
+func Assert(condition bool, msg string) {
+	if !condition {
+		panic(msg)
+	}
+}

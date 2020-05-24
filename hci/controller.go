@@ -3,14 +3,15 @@ package hci
 import (
 	"encoding/hex"
 	"log"
-	"sync"
 
 	hcicmdmgr "github.com/BertoldVdb/go-ble/hci/cmdmgr"
 	hcicommands "github.com/BertoldVdb/go-ble/hci/commands"
+	hciconnmgr "github.com/BertoldVdb/go-ble/hci/connmgr"
 	hciinterface "github.com/BertoldVdb/go-ble/hci/drivers/interface"
 	hcievents "github.com/BertoldVdb/go-ble/hci/events"
 	bleutil "github.com/BertoldVdb/go-ble/util"
 	"github.com/BertoldVdb/go-misc/closeflag"
+	"github.com/BertoldVdb/go-misc/multirun"
 
 	"github.com/sirupsen/logrus"
 )
@@ -22,15 +23,28 @@ type Controller struct {
 	logger *logrus.Entry
 	dev    hciinterface.HCIInterface
 	close  closeflag.CloseFlag
+	config *ControllerConfig
 
 	Hcicmdmgr *hcicmdmgr.CommandManager
 	Cmds      *hcicommands.Commands
 	Events    *hcievents.EventHandler
+	ConnMgr   *hciconnmgr.ConnectionManager
 
 	Info ControllerInfo
 
-	cbReady ReadyCallback
-	cbClose CloseCallback
+	multirun multirun.MultiRun
+}
+
+type ControllerConfig struct {
+	AwaitStartup     bool
+	LERandomAddrBits int
+}
+
+func DefaultConfig() *ControllerConfig {
+	return &ControllerConfig{
+		AwaitStartup:     false,
+		LERandomAddrBits: 24,
+	}
 }
 
 type ControllerInfo struct {
@@ -38,17 +52,17 @@ type ControllerInfo struct {
 	SupportedFeatures   *hcicommands.InformationalReadLocalSupportedFeaturesOutput
 	LESupportedFeatures *hcicommands.LEReadLocalSupportedFeaturesOutput
 	BdAddr              *hcicommands.InformationalReadBDADDROutput
+	RandomAddr          bleutil.MacAddr
 }
 
-func New(logger *logrus.Entry, dev hciinterface.HCIInterface, awaitStartup bool, cbReady ReadyCallback, cbClose CloseCallback) *Controller {
+func New(logger *logrus.Entry, dev hciinterface.HCIInterface, config *ControllerConfig) *Controller {
 	c := &Controller{
-		logger:  logger,
-		dev:     dev,
-		cbReady: cbReady,
-		cbClose: cbClose,
+		logger: logger,
+		dev:    dev,
+		config: config,
 	}
 
-	c.Hcicmdmgr = hcicmdmgr.New(bleutil.LogWithPrefix(logger, "cmdmgr"), []int{10}, awaitStartup, func(data []byte) error {
+	sendFunc := func(data []byte) error {
 		if logger != nil && logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
 			logger.WithFields(logrus.Fields{
 				"0data": hex.EncodeToString(data),
@@ -56,9 +70,12 @@ func New(logger *logrus.Entry, dev hciinterface.HCIInterface, awaitStartup bool,
 		}
 
 		return c.dev.SendPacket(hciinterface.HCITxPacket{Data: data})
-	})
+	}
+
+	c.Hcicmdmgr = hcicmdmgr.New(bleutil.LogWithPrefix(logger, "cmdmgr"), []int{10}, config.AwaitStartup, sendFunc)
 	c.Cmds = hcicommands.New(bleutil.LogWithPrefix(logger, "cmds"), c.Hcicmdmgr)
 	c.Events = hcievents.New(bleutil.LogWithPrefix(logger, "events"), c.Hcicmdmgr, c.Cmds)
+	c.ConnMgr = hciconnmgr.New(bleutil.LogWithPrefix(logger, "connmgr"), c.Cmds, c.Events, sendFunc)
 
 	c.dev.SetRecvHandler(func(rxPkt hciinterface.HCIRxPacket) error {
 		if rxPkt.Received == false {
@@ -75,83 +92,97 @@ func New(logger *logrus.Entry, dev hciinterface.HCIInterface, awaitStartup bool,
 			return nil
 		}
 
+		if c.ConnMgr.HandleData(rxPkt) {
+			return nil
+		}
+
 		log.Printf("Extra rx packet %+v\n", rxPkt)
+		c.dev.SendPacket(hciinterface.HCITxPacket{Data: rxPkt.Data})
 
 		return nil
 	})
 
+	c.multirun.RegisterRunnable(c.dev)
+	c.multirun.RegisterRunnable(c.Hcicmdmgr)
+	c.multirun.RegisterFunc(func() error {
+		return c.configureDevice()
+	}, func() error {
+		return c.Cmds.BasebandResetSync()
+	})
+	c.multirun.RegisterRunnable(c.ConnMgr)
+
 	return c
 }
 
-func (c *Controller) Run() error {
-	var wg sync.WaitGroup
-	var errDevice, errCmdMgr error
-
-	wg.Add(2)
-	go func() {
-		defer c.Close()
-		errDevice = c.dev.Run()
-		wg.Done()
-	}()
-	go func() {
-		defer c.Close()
-		errCmdMgr = c.Hcicmdmgr.Run()
-		wg.Done()
-	}()
-
-	errCmd := c.Cmds.BasebandResetSync()
-	if errCmd != nil {
-		c.Close()
+func (c *Controller) configureDevice() error {
+	err := c.Cmds.BasebandResetSync()
+	if err != nil {
+		return err
 	}
 
-	c.Info.BdAddr, errCmd = c.Cmds.InformationalReadBDADDRSync(nil)
-	if errCmd != nil {
-		c.Close()
+	/* Quirk: Should not be needed unless we support EDR as well, but some controllers
+	   require it to work with extended LE commands at all */
+	c.Cmds.BasebandWriteLEHostSupportSync(hcicommands.BasebandWriteLEHostSupportInput{
+		LESupportedHost: 1,
+	})
+
+	/* Packet based flow control */
+	c.Cmds.BasebandWriteFlowControlModeSync(hcicommands.BasebandWriteFlowControlModeInput{})
+
+	c.Info.BdAddr, err = c.Cmds.InformationalReadBDADDRSync(nil)
+	if err != nil {
+		return err
 	}
 
-	c.Info.SupportedCommands, errCmd = c.Cmds.InformationalReadLocalSupportedCommandsSync(nil)
-	if errCmd != nil {
-		c.Close()
+	/* Setup the privacy address */
+	err = c.setLERandomAddress()
+	if err != nil {
+		return err
 	}
 
-	c.Info.SupportedFeatures, errCmd = c.Cmds.InformationalReadLocalSupportedFeaturesSync(nil)
-	if errCmd != nil {
-		c.Close()
+	/*
+		//TOOD: Just safekeeping the minimum advertising code to put in the right place later
+		c.Cmds.LESetAdvertisingDataSync(hcicommands.LESetAdvertisingDataInput{
+			AdvertisingDataLength: 3,
+			AdvertisingData:       [31]byte{2, 1, 6},
+		})
+
+		c.Cmds.LESetScanResponseDataSync(hcicommands.LESetScanResponseDataInput{
+			ScanResponseDataLength: 4,
+			ScanResponseData:       [31]byte{3, 9, 'B', 'e'},
+		})
+
+		c.Cmds.LESetAdvertisingParametersSync(hcicommands.LESetAdvertisingParametersInput{
+			AdvertisingIntervalMin:  0x20,
+			AdvertisingIntervalMax:  0x40,
+			AdvertisingType:         2,
+			OwnAddressType:          1,
+			AdvertisingChannelMap:   7,
+			AdvertisingFilterPolicy: 0,
+		})
+
+		c.Cmds.LESetAdvertisingEnableSync(hcicommands.LESetAdvertisingEnableInput{
+			AdvertisingEnable: 1,
+		})*/
+
+	c.Info.SupportedCommands, err = c.Cmds.InformationalReadLocalSupportedCommandsSync(nil)
+	if err != nil {
+		return err
 	}
 
-	c.Info.LESupportedFeatures, errCmd = c.Cmds.LEReadLocalSupportedFeaturesSync(nil)
-	if errCmd != nil {
-		c.Close()
+	c.Info.SupportedFeatures, err = c.Cmds.InformationalReadLocalSupportedFeaturesSync(nil)
+	if err != nil {
+		return err
 	}
 
-	if errCmd == nil && c.cbReady != nil {
-		wg.Add(1)
-		go func() {
-			defer c.Close()
-			errCmd = c.cbReady()
-			wg.Done()
-		}()
-	}
+	c.Info.LESupportedFeatures, err = c.Cmds.LEReadLocalSupportedFeaturesSync(nil)
+	return err
+}
 
-	wg.Wait()
-
-	if errCmd != nil {
-		return errCmd
-	} else if errDevice != nil {
-		return errDevice
-	}
-	return errCmdMgr
+func (c *Controller) Run(ready func()) error {
+	return c.multirun.Run(ready)
 }
 
 func (c *Controller) Close() error {
-	if c.close.Close() == nil {
-		c.dev.Close()
-		c.Hcicmdmgr.Close()
-
-		if c.cbClose != nil {
-			c.cbClose()
-		}
-	}
-
-	return nil
+	return c.multirun.Close()
 }

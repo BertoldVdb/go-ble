@@ -70,10 +70,11 @@ func (s *CommandManager) Run() error {
 	return err
 }
 
-func (s *CommandManager) Close() {
+func (s *CommandManager) Close() error {
 	if s.closeFlag.Close() == nil {
 		for i := range s.queues {
 			s.queues[i].closeQueue()
 		}
 	}
+	return nil
 }

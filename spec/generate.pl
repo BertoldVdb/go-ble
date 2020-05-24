@@ -292,9 +292,9 @@ EOF
         my $dlevel = "Debug";
 
         #Reduce some ultra frequent events to trace priority
-        if ($event eq "CommandCompleteEvent" || $event eq "CommandStatusEvent" || $event eq "LEAdvertisingReportEvent"){
+        #if ($event eq "CommandCompleteEvent" || $event eq "CommandStatusEvent" || $event eq "LEAdvertisingReportEvent"){
             $dlevel = "Trace";
-        }
+        #}
 
         $eventDecoder .= <<EOF;
 \tcase $ocf$subeventStr:
