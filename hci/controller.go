@@ -3,6 +3,7 @@ package hci
 import (
 	"encoding/hex"
 	"log"
+	"sync"
 
 	hcicmdmgr "github.com/BertoldVdb/go-ble/hci/cmdmgr"
 	hcicommands "github.com/BertoldVdb/go-ble/hci/commands"
@@ -20,10 +21,11 @@ type ReadyCallback func() error
 type CloseCallback func()
 
 type Controller struct {
-	logger *logrus.Entry
-	dev    hciinterface.HCIInterface
-	close  closeflag.CloseFlag
-	config *ControllerConfig
+	logger   *logrus.Entry
+	devMutex sync.Mutex
+	dev      hciinterface.HCIInterface
+	close    closeflag.CloseFlag
+	config   *ControllerConfig
 
 	Hcicmdmgr *hcicmdmgr.CommandManager
 	Cmds      *hcicommands.Commands
@@ -38,12 +40,20 @@ type Controller struct {
 type ControllerConfig struct {
 	AwaitStartup     bool
 	LERandomAddrBits int
+
+	PrivacyConnect   bool
+	PrivacyScan      bool
+	PrivacyAdvertise bool
 }
 
 func DefaultConfig() *ControllerConfig {
 	return &ControllerConfig{
 		AwaitStartup:     false,
 		LERandomAddrBits: 24,
+
+		PrivacyConnect:   true,
+		PrivacyScan:      true,
+		PrivacyAdvertise: true,
 	}
 }
 
@@ -69,6 +79,8 @@ func New(logger *logrus.Entry, dev hciinterface.HCIInterface, config *Controller
 			}).Trace("Writing HCI TX Packet to hardware")
 		}
 
+		c.devMutex.Lock()
+		defer c.devMutex.Unlock()
 		return c.dev.SendPacket(hciinterface.HCITxPacket{Data: data})
 	}
 
@@ -139,31 +151,6 @@ func (c *Controller) configureDevice() error {
 	if err != nil {
 		return err
 	}
-
-	/*
-		//TOOD: Just safekeeping the minimum advertising code to put in the right place later
-		c.Cmds.LESetAdvertisingDataSync(hcicommands.LESetAdvertisingDataInput{
-			AdvertisingDataLength: 3,
-			AdvertisingData:       [31]byte{2, 1, 6},
-		})
-
-		c.Cmds.LESetScanResponseDataSync(hcicommands.LESetScanResponseDataInput{
-			ScanResponseDataLength: 4,
-			ScanResponseData:       [31]byte{3, 9, 'B', 'e'},
-		})
-
-		c.Cmds.LESetAdvertisingParametersSync(hcicommands.LESetAdvertisingParametersInput{
-			AdvertisingIntervalMin:  0x20,
-			AdvertisingIntervalMax:  0x40,
-			AdvertisingType:         2,
-			OwnAddressType:          1,
-			AdvertisingChannelMap:   7,
-			AdvertisingFilterPolicy: 0,
-		})
-
-		c.Cmds.LESetAdvertisingEnableSync(hcicommands.LESetAdvertisingEnableInput{
-			AdvertisingEnable: 1,
-		})*/
 
 	c.Info.SupportedCommands, err = c.Cmds.InformationalReadLocalSupportedCommandsSync(nil)
 	if err != nil {

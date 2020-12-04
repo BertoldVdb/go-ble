@@ -18,19 +18,21 @@ const (
 )
 
 func (c *Controller) GetLERecommenedOwnAddrType(usage LEAddrUsage) bleutil.MacAddrType {
-	return 0
-
 	if c.Info.RandomAddr == 0 {
 		return 0
 	}
 
-	if usage == LEAddrUsageConnect {
-		//TODO: add a system for using quirks depending on the host controller
-		//Cambridge Silicon Radio dongles don't seem to connect properly when using the random address.
-		return 0
+	if c.config.PrivacyScan && usage == LEAddrUsageScan {
+		return 1
+	}
+	if c.config.PrivacyConnect && usage == LEAddrUsageConnect {
+		return 1
+	}
+	if c.config.PrivacyAdvertise && usage == LEAddrUsageAdvertise {
+		return 1
 	}
 
-	return 1
+	return 0
 }
 
 func (c *Controller) setLERandomAddress() error {

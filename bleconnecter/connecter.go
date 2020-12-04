@@ -3,8 +3,10 @@ package bleconnecter
 import (
 	"context"
 	"errors"
+	"net"
 	"sync"
 
+	"github.com/BertoldVdb/go-ble/bleadvertiser"
 	"github.com/BertoldVdb/go-ble/hci"
 	hcicommands "github.com/BertoldVdb/go-ble/hci/commands"
 	hciconnmgr "github.com/BertoldVdb/go-ble/hci/connmgr"
@@ -21,48 +23,79 @@ var (
 type BLEConnecterConfig struct {
 }
 
+type BLEConnectionRole struct {
+	singleChan   chan (struct{})
+	peerMutex    sync.Mutex
+	peerValid    bool
+	peer         *BLEConnection
+	peerResponse chan (struct{})
+}
+
 type BLEConnecter struct {
-	logger *logrus.Entry
-	config *BLEConnecterConfig
-	ctrl   *hci.Controller
+	logger     *logrus.Entry
+	config     *BLEConnecterConfig
+	ctrl       *hci.Controller
+	advertiser *bleadvertiser.BLEAdvertiser
 
 	closeflag closeflag.CloseFlag
 
-	connectionSingleChan   chan (struct{})
-	connectionPeerMutex    sync.Mutex
-	connectionPeerValid    bool
-	connectionPeer         *BLEConnection
-	connectionPeerResponse chan (struct{})
+	roles [2]BLEConnectionRole
 }
 
 type BLEConnection struct {
+	*hciconnmgr.Connection
+
 	connecter *BLEConnecter
 	event     *hcievents.LEConnectionCompleteEvent
 
-	HwConn   *hciconnmgr.Connection
-	PeerAddr bleutil.BLEAddr
-	IsMaster bool
+	peerAddrCandidates []bleutil.BLEAddr
+	peerAddr           bleutil.BLEAddr
+
+	isCentral bool
 
 	parametersMutex  sync.RWMutex
 	parametersActual BLEConnectionParametersActual
 }
 
-func New(logger *logrus.Entry, ctrl *hci.Controller, config *BLEConnecterConfig) *BLEConnecter {
+func (c *BLEConnection) LocalAddr() net.Addr {
+	return c.connecter.ctrl.Info.BdAddr.BDADDR
+}
+
+func (c *BLEConnection) RemoteAddr() net.Addr {
+	return c.peerAddr
+}
+
+func New(logger *logrus.Entry, ctrl *hci.Controller, advertiser *bleadvertiser.BLEAdvertiser, config *BLEConnecterConfig) *BLEConnecter {
 	e := &BLEConnecter{
-		logger:                 logger,
-		config:                 config,
-		ctrl:                   ctrl,
-		connectionSingleChan:   make(chan (struct{}), 1),
-		connectionPeerResponse: make(chan (struct{}), 1),
+		logger:     logger,
+		config:     config,
+		ctrl:       ctrl,
+		advertiser: advertiser,
+	}
+
+	for i := range e.roles {
+		e.roles[i] = BLEConnectionRole{
+			singleChan:   make(chan (struct{}), 1),
+			peerResponse: make(chan (struct{}), 1),
+		}
 	}
 
 	return e
 }
 
 func (c *BLEConnecter) leConnectionCompleteHandler(event *hcievents.LEConnectionCompleteEvent) *hcievents.LEConnectionCompleteEvent {
+	if event.Role > 1 {
+		return event
+	}
+
 	var hwConn *hciconnmgr.Connection
 	if event.Status == 0 {
-		hwConn = c.ctrl.ConnMgr.ConnectionNew(event.ConnectionHandle)
+		hwConn = c.ctrl.ConnMgr.ConnectionNew(event.ConnectionHandle, func() error {
+			if c.advertiser == nil {
+				return nil
+			}
+			return c.advertiser.StateChanged()
+		})
 	}
 
 	remoteAddr := bleutil.BLEAddr{
@@ -70,20 +103,36 @@ func (c *BLEConnecter) leConnectionCompleteHandler(event *hcievents.LEConnection
 		MacAddrType: event.PeerAddressType,
 	}
 
-	c.connectionPeerMutex.Lock()
-	rightPeer := c.connectionPeerValid &&
-		((event.Role == 0 && c.connectionPeer.IsMaster && c.connectionPeer.PeerAddr == remoteAddr) ||
-			(event.Role == 1 && !c.connectionPeer.IsMaster))
+	role := &c.roles[event.Role]
+
+	role.peerMutex.Lock()
+	rightPeer := false
+
+	if role.peerValid {
+		if role.peer.peerAddrCandidates == nil {
+			rightPeer = true
+		} else {
+			for _, m := range role.peer.peerAddrCandidates {
+				if m == remoteAddr {
+					rightPeer = true
+					break
+				}
+			}
+		}
+	}
 
 	if rightPeer {
-		c.connectionPeerValid = false
-		c.connectionPeer.PeerAddr = remoteAddr
-		c.connectionPeer.event = event
-		c.connectionPeer.HwConn = hwConn
-		hwConn.AppConn = c.connectionPeer
-		c.connectionPeerResponse <- struct{}{}
+		role.peerValid = false
+		role.peer.peerAddr = remoteAddr
+		role.peer.event = event
+		role.peer.Connection = hwConn
+		if hwConn != nil {
+			hwConn.AppConn = role.peer
+		}
+		role.peerResponse <- struct{}{}
 	}
-	c.connectionPeerMutex.Unlock()
+
+	role.peerMutex.Unlock()
 
 	if !rightPeer {
 		c.logger.WithField("0event", event).Debug("Received event for wrong target address")
@@ -115,7 +164,9 @@ func (c *BLEConnecter) Run() error {
 	c.ctrl.Events.SetLEConnectionUpdateCompleteEventCallback(c.leConnectionUpdateCompleteHandler)
 
 	/* Activate the connect calls */
-	c.connectionSingleChan <- struct{}{}
+	for _, m := range c.roles {
+		m.singleChan <- struct{}{}
+	}
 
 	<-c.closeflag.Chan()
 
@@ -126,42 +177,76 @@ func (c *BLEConnecter) Close() error {
 	return c.closeflag.Close()
 }
 
-func (c *BLEConnecter) Connect(ctx context.Context, peerAddr bleutil.BLEAddr, request BLEConnectionParametersRequested) (*BLEConnection, error) {
+func (c *BLEConnecter) Connect(ctx context.Context, isCentral bool, peerAddrs []bleutil.BLEAddr, request BLEConnectionParametersRequested) (*BLEConnection, []bleutil.BLEAddr, error) {
 	var err error
+
+	roleID := 0
+	if !isCentral {
+		roleID = 1
+	}
+	role := &c.roles[roleID]
 
 	/* Ensure only one connect call can be outstanding */
 	select {
 	case <-c.closeflag.Chan():
-		return nil, ErrorClosed
+		return nil, peerAddrs, ErrorClosed
 	case <-ctx.Done():
-		return nil, ctx.Err()
-	case <-c.connectionSingleChan:
+		return nil, peerAddrs, ctx.Err()
+	case <-role.singleChan:
 	}
 
-	defer func() { c.connectionSingleChan <- struct{}{} }()
+	defer func() { role.singleChan <- struct{}{} }()
 
-	c.logger.WithField("0addr", peerAddr).Debug("Starting connection")
+	c.logger.WithField("0addr", peerAddrs).Debug("Starting connection")
 
 	conn := &BLEConnection{
-		connecter: c,
-		PeerAddr:  peerAddr,
-		IsMaster:  peerAddr.MacAddr != 0,
+		connecter:          c,
+		isCentral:          isCentral,
+		peerAddrCandidates: peerAddrs,
 	}
 
 	request.makeValid()
 
-	c.connectionPeerMutex.Lock()
-	c.connectionPeerValid = true
-	c.connectionPeer = conn
-	c.connectionPeerMutex.Unlock()
+	role.peerMutex.Lock()
+	role.peerValid = true
+	role.peer = conn
+	role.peerMutex.Unlock()
 
-	if conn.IsMaster {
+	stopPeer := func() {
+		role.peerMutex.Lock()
+		role.peerValid = false
+		role.peerMutex.Unlock()
+
+		/* Clear the channel in case we raced */
+		select {
+		case <-role.peerResponse:
+		default:
+		}
+	}
+
+	var advCancelFunc func() error
+
+	if conn.isCentral {
+		err = c.ctrl.Cmds.LEClearWhiteListSync()
+		if err != nil {
+			return nil, peerAddrs, err
+		}
+
+		for _, m := range peerAddrs {
+			err = c.ctrl.Cmds.LEAddDeviceToWhiteListSync(hcicommands.LEAddDeviceToWhiteListInput{
+				AddressType: m.MacAddrType,
+				Address:     m.MacAddr,
+			})
+
+			if err != nil {
+				return nil, peerAddrs, err
+			}
+		}
+
 		param := hcicommands.LECreateConnectionInput{
 			LEScanInterval:        0x10, /* Scan all the time */
 			LEScanWindow:          0x10,
-			InitiatorFilterPolicy: 0,
-			PeerAddressType:       peerAddr.MacAddrType,
-			PeerAddress:           peerAddr.MacAddr,
+			InitiatorFilterPolicy: 1, /* Use allowlist */
 			OwnAddressType:        c.ctrl.GetLERecommenedOwnAddrType(hci.LEAddrUsageConnect),
 
 			ConnectionIntervalMin: request.ConnectionIntervalMin,
@@ -174,16 +259,30 @@ func (c *BLEConnecter) Connect(ctx context.Context, peerAddr bleutil.BLEAddr, re
 
 		err = c.ctrl.Cmds.LECreateConnectionSync(param)
 		if err != nil {
-			return nil, err
+			stopPeer()
+			return nil, peerAddrs, err
 		}
 	} else {
-		//TODO: Set advertising to connectable, or enable it if not on at all.
-		//TODO use defer to reset advertising state
+		/* Enable the advertiser in the right mode.
+		   If there is only one peerAddr use directed adv.
+		   Do not use allowlist in peripheral mode
+		*/
+		if c.advertiser != nil {
+			var target *bleutil.BLEAddr
+			if len(peerAddrs) == 1 {
+				target = &peerAddrs[0]
+			}
+			advCancelFunc, err = c.advertiser.LegacyAdvertisingSetConnection(false, target)
+			if err != nil {
+				stopPeer()
+				return nil, peerAddrs, err
+			}
+		}
 	}
 
 	/* Wait for the connection complete event or timeout */
 	select {
-	case <-c.connectionPeerResponse:
+	case <-role.peerResponse:
 		err = nil
 	case <-ctx.Done():
 		err = ctx.Err()
@@ -191,47 +290,42 @@ func (c *BLEConnecter) Connect(ctx context.Context, peerAddr bleutil.BLEAddr, re
 		err = ErrorClosed
 	}
 
-	c.connectionPeerMutex.Lock()
-	c.connectionPeerValid = false
-	c.connectionPeerMutex.Unlock()
+	stopPeer()
 
-	/* Clear the channel in case we raced */
-	select {
-	case <-c.connectionPeerResponse:
-	default:
+	if !conn.isCentral && advCancelFunc != nil {
+		advCancelFunc()
 	}
 
 	if conn.event == nil {
-		c.logger.WithError(err).WithField("0addr", conn.PeerAddr).Debug("No event received, cancelling")
+		c.logger.WithError(err).WithField("0addr", conn.peerAddr).Debug("No event received, cancelling")
 
 		/* This can fail, log error but don't act on it */
-		if conn.IsMaster {
+		if peerAddrs != nil && conn.isCentral {
 			c.ctrl.Cmds.LECreateConnectionCancelSync()
-		} else {
-			//TODO: Do something with the advertiser
 		}
-		return nil, err
+
+		return nil, peerAddrs, err
 	} else if err != nil {
-		c.logger.WithError(err).WithField("0addr", conn.PeerAddr).Debug("Event received, still cancelling")
+		c.logger.WithError(err).WithField("0addr", conn.peerAddr).Debug("Event received, still cancelling")
 
 		/* We got the event, but the system is closing down or it came too late */
 		if conn.event.Status == 0 {
 			conn.Close()
 		}
-		return nil, err
+		return nil, peerAddrs, err
 	}
 
 	/* Was it succesful? */
-	if conn.HwConn == nil {
+	if conn.Connection == nil {
 		c.logger.WithFields(logrus.Fields{
-			"0addr":   conn.PeerAddr,
+			"0addr":   conn.peerAddr,
 			"1status": conn.event.Status}).Debug("Connection failed")
-		return nil, hcicommands.HciErrorToGo([]byte{conn.event.Status}, nil)
+		return nil, peerAddrs, hcicommands.HciErrorToGo([]byte{conn.event.Status}, nil)
 	}
 
 	/* conn contains a valid hardware conection, that didn't timeout and we are ready to use it */
 	c.logger.WithFields(logrus.Fields{
-		"0addr":   conn.PeerAddr,
+		"0addr":   conn.peerAddr,
 		"1handle": conn.event.ConnectionHandle}).Info("Connection established")
 
 	conn.parametersMutex.Lock()
@@ -242,13 +336,19 @@ func (c *BLEConnecter) Connect(ctx context.Context, peerAddr bleutil.BLEAddr, re
 	}
 	conn.parametersMutex.Unlock()
 
-	if !conn.IsMaster {
+	if !conn.isCentral {
 		conn.UpdateParams(request)
+	} else {
+		role.peer.peerAddrCandidates = nil
+		newPeers := []bleutil.BLEAddr{}
+
+		for _, m := range peerAddrs {
+			if m != role.peer.peerAddr {
+				newPeers = append(newPeers, m)
+			}
+		}
+		peerAddrs = newPeers
 	}
 
-	return conn, nil
-}
-
-func (c *BLEConnection) Close() error {
-	return c.HwConn.Close()
+	return conn, peerAddrs, nil
 }

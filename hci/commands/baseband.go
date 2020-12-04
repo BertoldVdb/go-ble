@@ -5463,51 +5463,41 @@ log:
 
 	 return err
 }
-// BasebandConfigureDataPathOutput represents the output of the command specified in Section 7.3.101
-type BasebandConfigureDataPathOutput struct {
-	Status uint8
-	HCIVersion uint8
-	HCIRevision uint16
-	LMPPALVersion uint8
-	ManufacturerName uint16
-	LMPPALSubversion uint16
+// BasebandConfigureDataPathInput represents the input of the command specified in Section 7.3.101
+type BasebandConfigureDataPathInput struct {
+	DataPathDirection uint8
+	DataPathID uint8
+	VendorSpecificConfigLength uint8
+	VendorSpecificConfig []byte
 }
 
-func (o *BasebandConfigureDataPathOutput) decode(data []byte) bool {
-	r := bleutil.Reader{Data: data};
-	o.Status = uint8(r.GetOne())
-	o.HCIVersion = uint8(r.GetOne())
-	o.HCIRevision = binary.LittleEndian.Uint16(r.Get(2))
-	o.LMPPALVersion = uint8(r.GetOne())
-	o.ManufacturerName = binary.LittleEndian.Uint16(r.Get(2))
-	o.LMPPALSubversion = binary.LittleEndian.Uint16(r.Get(2))
-	return r.Valid()
+func (i BasebandConfigureDataPathInput) encode(data []byte) []byte {
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.DataPathDirection))
+	w.PutOne(uint8(i.DataPathID))
+	w.PutOne(uint8(i.VendorSpecificConfigLength))
+	w.PutSlice(i.VendorSpecificConfig)
+	return w.Data
 }
 
 // BasebandConfigureDataPathSync executes the command specified in Section 7.3.101 synchronously
-func (c *Commands) BasebandConfigureDataPathSync (result *BasebandConfigureDataPathOutput) (*BasebandConfigureDataPathOutput, error) {
+func (c *Commands) BasebandConfigureDataPathSync (params BasebandConfigureDataPathInput) error {
 	var err2 error
 	var response []byte
 	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
 		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
 		}).Trace("BasebandConfigureDataPath started")
 	}
-	if result == nil {
-		result = &BasebandConfigureDataPathOutput{}
-	}
-
 	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 3, OCF: 0x0083}, nil)
 	if err != nil {
 		goto log
 	}
 
+	buffer.Buffer = params.encode(buffer.Buffer)
 	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
 	if err != nil {
 		goto log
-	}
-
-	if !result.decode(response) {
-		err = ErrorMalformed
 	}
 
 	err = HciErrorToGo(response, err)
@@ -5520,9 +5510,9 @@ func (c *Commands) BasebandConfigureDataPathSync (result *BasebandConfigureDataP
 log:
 	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
 		c.logger.WithError(err).WithFields(logrus.Fields{
-			 "1result": result,
+			 "0params": params,
 		}).Debug("BasebandConfigureDataPath completed")
 	}
 
-	 return result, err
+	 return err
 }

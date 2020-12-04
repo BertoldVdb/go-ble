@@ -4,7 +4,6 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/BertoldVdb/go-misc/bufferfifo"
 	"github.com/BertoldVdb/go-misc/closeflag"
 	"github.com/BertoldVdb/go-misc/multirun"
 	"github.com/sirupsen/logrus"
@@ -27,11 +26,13 @@ type ConnectionManager struct {
 
 	connections map[uint16]*Connection
 
-	rxtxFreeBuffers *bufferfifo.FIFO
-
-	txSlotManagerEDRACL *txSlotManager //Not used for now
+	txSlotManagerEDRACL *txSlotManager
 	txSlotManagerEDRSDO *txSlotManager //Not used for now
 	txSlotManagerLEACL  *txSlotManager
+
+	useWg sync.WaitGroup
+
+	useBroadcomQuirk bool
 }
 
 var (
@@ -47,8 +48,6 @@ func New(logger *logrus.Entry, cmds *hcicommands.Commands, events *hcievents.Eve
 		sendFunc: sendFunc,
 
 		connections: make(map[uint16]*Connection),
-
-		rxtxFreeBuffers: bufferfifo.New(16),
 	}
 }
 
@@ -90,12 +89,23 @@ func (c *ConnectionManager) closeAll() {
 }
 
 func (c *ConnectionManager) Run() error {
+	defer c.useWg.Wait()
+
 	err := c.Events.SetDisconnectionCompleteEventCallback(c.disconnectionCompleteHandler)
 	if err != nil {
 		return err
 	}
 
 	defer c.closeAll()
+
+	/* Broadcom chips seem to encode the ack message incorrectly, detect that here */
+	version, err := c.Cmds.InformationalReadLocalVersionInformationSync(nil)
+	if err == nil {
+		if version.ManufacturerName == 15 {
+			c.logger.Warn("Detected Broadcom chip: using TX quirk.")
+			c.useBroadcomQuirk = true
+		}
+	}
 
 	err = c.runSlotManagers()
 	if err != nil {

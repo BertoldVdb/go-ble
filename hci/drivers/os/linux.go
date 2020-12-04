@@ -344,6 +344,9 @@ func (d *HCILinux) Run() error {
 		d.Unlock()
 
 		_, err := unix.Poll(pfd, -1)
+		if err == syscall.EINTR {
+			continue
+		}
 		if err != nil {
 			return err
 		}
@@ -354,6 +357,9 @@ func (d *HCILinux) Run() error {
 
 		if pfd[0].Revents&unix.POLLIN > 0 {
 			n, oobn, _, _, err := unix.Recvmsg(d.sock, bufData, bufOOB, 0)
+			if err == syscall.EINTR {
+				continue
+			}
 			if err != nil {
 				return err
 			}
@@ -418,8 +424,13 @@ func (d *HCILinux) Close() error {
 	d.closed = true
 
 	if d.closePipe[1] >= 0 {
-		_, err := unix.Write(d.closePipe[1], []byte{'c'})
-		return err
+		for {
+			_, err := unix.Write(d.closePipe[1], []byte{'c'})
+			if err == syscall.EINTR {
+				continue
+			}
+			return err
+		}
 	}
 
 	return unix.Close(d.sock)
@@ -433,8 +444,14 @@ func (d *HCILinux) SendPacket(pkt hciinterface.HCITxPacket) error {
 	if d.closed {
 		return ErrorClosed
 	}
-	_, err := unix.Write(d.sock, pkt.Data)
-	return err
+
+	for {
+		_, err := unix.Write(d.sock, pkt.Data)
+		if err == syscall.EINTR {
+			continue
+		}
+		return err
+	}
 }
 
 // SetRecvHandler configures the receive handler callback function. It will be called

@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"log"
 
 	bleutil "github.com/BertoldVdb/go-ble/util"
 	"github.com/sirupsen/logrus"
@@ -224,9 +223,12 @@ func (d *BLEDevice) handleUUID(gap *GAPRecord) {
 	for {
 		if len(data) < l {
 			if len(data) != 0 {
-				/* Seems some bytes remain, maybe we parsed it wrong or the device sent it wrong */
-				//TODO: log
-				log.Println("?????")
+				if d.scanner.logger != nil {
+					d.scanner.logger.WithFields(logrus.Fields{
+						"0addr": d.addr,
+						"1name": d.name,
+					}).Debug("UUID beacon incomplete")
+				}
 			}
 			return
 		}

@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 
+	bleutil "github.com/BertoldVdb/go-ble/util"
+	pdu "github.com/BertoldVdb/go-misc/pdubuf"
 	"github.com/sirupsen/logrus"
 )
 
@@ -54,11 +56,11 @@ func (c *ConnectionManager) handleACL(data []byte) bool {
 
 	if flagPB == 2 {
 		/* New fragment, clear reassembly buffer */
-		conn.rxBuffer = conn.rxBuffer[:0]
+		conn.rxPDU.Reset()
 	}
 
 	/* Append fragment */
-	conn.rxBuffer = append(conn.rxBuffer, payload...)
+	conn.rxPDU.Append(payload...)
 
 	/* Complete L2CAP packet? */
 	conn.handleACLData()
@@ -67,21 +69,23 @@ func (c *ConnectionManager) handleACL(data []byte) bool {
 }
 
 func (c *Connection) handleACLData() error {
-	workBuf := c.rxBuffer
-
 	for {
-		bufLen := len(workBuf)
-		if bufLen < 4 {
+		if c.rxPDU.Len() < 4 {
 			break
 		}
 
-		pktLen := int(binary.LittleEndian.Uint16(workBuf[0:2])) + 4
-		if pktLen < bufLen {
+		pktLen := int(binary.LittleEndian.Uint16(c.rxPDU.Buf()[0:2])) + 4
+		payload := c.rxPDU.DropLeft(pktLen)
+		if payload == nil {
 			break
 		}
 
-		pktBuf := c.connmgr.rxtxFreeBuffers.PopOrCreate(pktLen)
-		copy(pktBuf, workBuf[:pktLen])
+		pktBuf := bleutil.CopyBufferFromSlice(payload)
+
+		pktPrint := ""
+		if c.connmgr.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+			pktPrint = pktBuf.String()
+		}
 
 		fifoLen := c.rxFIFO.Push(pktBuf)
 		select {
@@ -93,61 +97,67 @@ func (c *Connection) handleACLData() error {
 			c.connmgr.logger.WithFields(logrus.Fields{
 				"0handle":  c.handle,
 				"1fifolen": fifoLen,
-				"2l2cap":   hex.EncodeToString(pktBuf),
+				"2l2cap":   pktPrint,
 			}).Trace("Received valid L2CAP/ACL packet")
 		}
-
-		workBuf = workBuf[pktLen:]
 	}
 
-	copy(c.rxBuffer, workBuf)
-	c.rxBuffer = c.rxBuffer[:len(workBuf)]
+	/* Check that the leftcap is not growing too much to avoid memory DoS */
+	if c.rxPDU.LeftCap() > 8192 {
+		c.rxPDU.NormalizeLeft(0)
+	}
+
 	return nil
 }
 
-func (c *Connection) queueACLPacket(flagPB int, flagBC int, payload []byte) {
+func (c *Connection) queueACLPacket(flagPB int, flagBC int, payload *pdu.PDU) {
 	handle := c.handle
 	handle |= uint16(flagPB&0x3) << 12
 	handle |= uint16(flagBC&0x3) << 14
 
 	/* Add HCI header */
-	buf := c.connmgr.rxtxFreeBuffers.PopOrCreate(5 + len(payload))
-	buf[0] = 2
-	binary.LittleEndian.PutUint16(buf[1:3], handle)
-	binary.LittleEndian.PutUint16(buf[3:5], uint16(len(payload)))
+	pl := payload.Len()
+	header := payload.ExtendLeft(5)
+	header[0] = 2
+	binary.LittleEndian.PutUint16(header[1:3], handle)
+	binary.LittleEndian.PutUint16(header[3:5], uint16(pl))
 
-	/* Add payload */
-	copy(buf[5:], payload)
+	pktPrint := ""
+	if c.connmgr.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		pktPrint = payload.String()
+	}
 
-	fifoLen := c.txFIFO.Push(buf)
+	fifoLen := c.txFIFO.Push(payload)
 
 	if c.connmgr.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
 		c.connmgr.logger.WithFields(logrus.Fields{
 			"0handle":  c.handle,
 			"1fifolen": fifoLen,
-			"2l2cap":   hex.EncodeToString(buf),
+			"2l2cap":   pktPrint,
 		}).Trace("Queued ACL fragment for TX")
 	}
 }
 
-func (c *Connection) encodeACL(l2cap []byte) {
+func (c *Connection) encodeACL(l2capP *pdu.PDU) {
 	if c.connmgr.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
 		c.connmgr.logger.WithFields(logrus.Fields{
 			"0handle": c.handle,
-			"1l2cap":  hex.EncodeToString(l2cap),
+			"1l2cap":  l2capP,
 		}).Trace("Preparing L2CAP/ACL fragments for TX")
 	}
 
 	mtu := c.txSlotManager.GetBufferLength()
-
 	flagPB := 0
-	for len(l2cap) > 0 {
-		fragmentLen := len(l2cap)
-		if fragmentLen > mtu {
-			fragmentLen = mtu
+	for {
+		if l2capP.Len() > mtu {
+			/* If the buffer is too long, create a new one and take it from the l2capP */
+			frag := bleutil.CopyBufferFromSlice(l2capP.DropLeft(mtu))
+			c.queueACLPacket(flagPB, 0, frag)
+		} else {
+			/* Finally, just pass on l2capP itself */
+			c.queueACLPacket(flagPB, 0, l2capP)
+			break
 		}
-		c.queueACLPacket(flagPB, 0, l2cap[:fragmentLen])
-		l2cap = l2cap[fragmentLen:]
 
 		/* The next fragments are continuation */
 		flagPB = 1

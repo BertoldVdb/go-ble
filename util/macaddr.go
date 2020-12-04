@@ -40,6 +40,10 @@ func (m MacAddr) String() string {
 	return fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x", bytes[5], bytes[4], bytes[3], bytes[2], bytes[1], bytes[0])
 }
 
+func (m MacAddr) Network() string {
+	return "Bluetooth"
+}
+
 func MacAddrFromString(mac string) (MacAddr, error) {
 	mac = strings.ReplaceAll(mac, ":", "")
 	mac = strings.ReplaceAll(mac, "/", "")
@@ -118,4 +122,8 @@ func (a BLEAddr) IsLess(b BLEAddr) bool {
 		return a.MacAddrType < b.MacAddrType
 	}
 	return false
+}
+
+func (a BLEAddr) Network() string {
+	return "BLE"
 }

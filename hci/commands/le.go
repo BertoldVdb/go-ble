@@ -327,7 +327,7 @@ func (c *Commands) LESetAdvertisingParametersSync (params LESetAdvertisingParame
 	}
 
 log:
-	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
 		c.logger.WithError(err).WithFields(logrus.Fields{
 			 "0params": params,
 		}).Debug("LESetAdvertisingParameters completed")
@@ -431,7 +431,7 @@ func (c *Commands) LESetAdvertisingDataSync (params LESetAdvertisingDataInput) e
 	}
 
 log:
-	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
 		c.logger.WithError(err).WithFields(logrus.Fields{
 			 "0params": params,
 		}).Debug("LESetAdvertisingData completed")
@@ -480,7 +480,7 @@ func (c *Commands) LESetScanResponseDataSync (params LESetScanResponseDataInput)
 	}
 
 log:
-	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
 		c.logger.WithError(err).WithFields(logrus.Fields{
 			 "0params": params,
 		}).Debug("LESetScanResponseData completed")
@@ -527,7 +527,7 @@ func (c *Commands) LESetAdvertisingEnableSync (params LESetAdvertisingEnableInpu
 	}
 
 log:
-	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
 		c.logger.WithError(err).WithFields(logrus.Fields{
 			 "0params": params,
 		}).Debug("LESetAdvertisingEnable completed")

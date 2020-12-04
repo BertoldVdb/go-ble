@@ -224,6 +224,11 @@ EOF
             print "\terr = HciErrorToGo(response, err)\n";
         }
 
+	my $dlevel = "logrus.DebugLevel";
+        if ($name eq "LESetAdvertisingEnable" || $name eq "LESetAdvertisingParameters" || $name eq "LESetScanResponseData" || $name eq "LESetAdvertisingData"){
+            $dlevel = "logrus.TraceLevel";
+        }
+
         print <<EOF;
 
 \terr2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
@@ -232,7 +237,7 @@ EOF
 \t}
 
 log:
-\tif c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+\tif c.logger != nil && c.logger.Logger.IsLevelEnabled($dlevel) {
 \t\tc.logger.WithError(err).WithFields(logrus.Fields{
 EOF
         if($hasInput){
@@ -292,9 +297,9 @@ EOF
         my $dlevel = "Debug";
 
         #Reduce some ultra frequent events to trace priority
-        #if ($event eq "CommandCompleteEvent" || $event eq "CommandStatusEvent" || $event eq "LEAdvertisingReportEvent"){
+        if ($event eq "CommandCompleteEvent" || $event eq "CommandStatusEvent" || $event eq "LEAdvertisingReportEvent" || $event eq "NumberOfCompletedPacketsEvent"){
             $dlevel = "Trace";
-        #}
+        }
 
         $eventDecoder .= <<EOF;
 \tcase $ocf$subeventStr:

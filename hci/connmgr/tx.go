@@ -1,7 +1,6 @@
 package hciconnmgr
 
 import (
-	"encoding/hex"
 	"math"
 	"sync"
 	"sync/atomic"
@@ -154,13 +153,13 @@ func (s *txSlotManager) txWorker() error {
 						"0channel":     s.channel,
 						"1handle":      conn.handle,
 						"2outstanding": newOutstanding,
-						"3data":        hex.EncodeToString(buf),
+						"3data":        buf,
 					}).Trace("Sending fragment")
 				}
 
 				/* Send the packet */
-				err := s.connmgr.sendFunc(buf)
-				s.connmgr.rxtxFreeBuffers.Push(buf)
+				err := s.connmgr.sendFunc(buf.Buf())
+				bleutil.ReleaseBuffer(buf)
 
 				if err != nil {
 					return err
@@ -186,10 +185,7 @@ func quirkFixBroadcomCompleteEvent(event *hcievents.NumberOfCompletedPacketsEven
 }
 
 func (c *ConnectionManager) packetCompleteHandler(event *hcievents.NumberOfCompletedPacketsEvent) *hcievents.NumberOfCompletedPacketsEvent {
-	//TODO: add quirk system. This message seems to be encoded incorrectly in broadcom host controllers
-	//Fortunately, we can fix it.
-
-	if true {
+	if c.useBroadcomQuirk {
 		quirkFixBroadcomCompleteEvent(event)
 		if c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
 			c.logger.WithField("0data", event).Trace("Applied Broadcom PktComplete quirk")

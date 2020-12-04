@@ -16,3 +16,6 @@ perl generate.pl parsed.txt 6 >output/testing.go
 perl generate.pl parsed_events.txt 7 >output/events.go
 perl generate.pl parsed.txt 8 >output/le.go
 
+cp output/*.go ../hci/commands/
+mv ../hci/commands/events.go ../hci/events/events.go
+

@@ -1,6 +1,7 @@
 package ble
 
 import (
+	"github.com/BertoldVdb/go-ble/bleadvertiser"
 	"github.com/BertoldVdb/go-ble/bleconnecter"
 	"github.com/BertoldVdb/go-ble/blescanner"
 	"github.com/BertoldVdb/go-misc/multirun"
@@ -12,16 +13,23 @@ import (
 )
 
 type BluetoothStackConfig struct {
-	BLEScannerConfig   *blescanner.BLEScannerConfig
-	BLEConnecterConfig *bleconnecter.BLEConnecterConfig
-
+	BLEScannerUse       bool
+	BLEScannerConfig    *blescanner.BLEScannerConfig
+	BLEConnecterUse     bool
+	BLEConnecterConfig  *bleconnecter.BLEConnecterConfig
+	BLEAdvertiserUse    bool
+	BLEAdvertiserConfig *bleadvertiser.BLEAdvertiserConfig
 	HCIControllerConfig *hci.ControllerConfig
 }
 
 func DefaultConfig() *BluetoothStackConfig {
 	return &BluetoothStackConfig{
+		BLEScannerUse:       true,
 		BLEScannerConfig:    &blescanner.BLEScannerConfig{StoreGAPMap: true},
+		BLEConnecterUse:     true,
 		BLEConnecterConfig:  &bleconnecter.BLEConnecterConfig{},
+		BLEAdvertiserUse:    true,
+		BLEAdvertiserConfig: bleadvertiser.DefaultConfig(),
 		HCIControllerConfig: hci.DefaultConfig(),
 	}
 }
@@ -31,9 +39,10 @@ type BluetoothStack struct {
 	config   *BluetoothStackConfig
 	multirun multirun.MultiRun
 
-	Controller   *hci.Controller
-	BLEScanner   *blescanner.BLEScanner
-	BLEConnecter *bleconnecter.BLEConnecter
+	Controller    *hci.Controller
+	BLEScanner    *blescanner.BLEScanner
+	BLEAdvertiser *bleadvertiser.BLEAdvertiser
+	BLEConnecter  *bleconnecter.BLEConnecter
 }
 
 func New(logger *logrus.Entry, config *BluetoothStackConfig, dev hciinterface.HCIInterface) *BluetoothStack {
@@ -48,11 +57,19 @@ func New(logger *logrus.Entry, config *BluetoothStackConfig, dev hciinterface.HC
 
 	s.Controller = hci.New(bleutil.LogWithPrefix(logger, "hci"), dev, s.config.HCIControllerConfig)
 	s.BLEScanner = blescanner.New(bleutil.LogWithPrefix(logger, "scanner"), s.Controller, config.BLEScannerConfig)
-	s.BLEConnecter = bleconnecter.New(bleutil.LogWithPrefix(logger, "connecter"), s.Controller, config.BLEConnecterConfig)
+	s.BLEAdvertiser = bleadvertiser.New(bleutil.LogWithPrefix(logger, "advertiser"), s.Controller, config.BLEAdvertiserConfig)
+	s.BLEConnecter = bleconnecter.New(bleutil.LogWithPrefix(logger, "connecter"), s.Controller, s.BLEAdvertiser, config.BLEConnecterConfig)
 
 	s.multirun.RegisterRunnableReady(s.Controller)
-	s.multirun.RegisterRunnable(s.BLEScanner)
-	s.multirun.RegisterRunnable(s.BLEConnecter)
+	if config.BLEScannerUse {
+		s.multirun.RegisterRunnable(s.BLEScanner)
+	}
+	if config.BLEAdvertiserUse {
+		s.multirun.RegisterRunnable(s.BLEAdvertiser)
+	}
+	if config.BLEConnecterUse {
+		s.multirun.RegisterRunnable(s.BLEConnecter)
+	}
 
 	return s
 }

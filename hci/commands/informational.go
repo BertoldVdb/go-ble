@@ -7,6 +7,69 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// InformationalReadLocalVersionInformationOutput represents the output of the command specified in Section 7.4.1
+type InformationalReadLocalVersionInformationOutput struct {
+	Status uint8
+	HCIVersion uint8
+	HCIRevision uint16
+	LMPPALVersion uint8
+	ManufacturerName uint16
+	LMPPALSubversion uint16
+}
+
+func (o *InformationalReadLocalVersionInformationOutput) decode(data []byte) bool {
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
+	o.HCIVersion = uint8(r.GetOne())
+	o.HCIRevision = binary.LittleEndian.Uint16(r.Get(2))
+	o.LMPPALVersion = uint8(r.GetOne())
+	o.ManufacturerName = binary.LittleEndian.Uint16(r.Get(2))
+	o.LMPPALSubversion = binary.LittleEndian.Uint16(r.Get(2))
+	return r.Valid()
+}
+
+// InformationalReadLocalVersionInformationSync executes the command specified in Section 7.4.1 synchronously
+func (c *Commands) InformationalReadLocalVersionInformationSync (result *InformationalReadLocalVersionInformationOutput) (*InformationalReadLocalVersionInformationOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+		}).Trace("InformationalReadLocalVersionInformation started")
+	}
+	if result == nil {
+		result = &InformationalReadLocalVersionInformationOutput{}
+	}
+
+	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 4, OCF: 0x0001}, nil)
+	if err != nil {
+		goto log
+	}
+
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	if err != nil {
+		goto log
+	}
+
+	if !result.decode(response) {
+		err = ErrorMalformed
+	}
+
+	err = HciErrorToGo(response, err)
+
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	if err2 != nil {
+		err = err2
+	}
+
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "1result": result,
+		}).Debug("InformationalReadLocalVersionInformation completed")
+	}
+
+	 return result, err
+}
 // InformationalReadLocalSupportedCommandsOutput represents the output of the command specified in Section 7.4.2
 type InformationalReadLocalSupportedCommandsOutput struct {
 	Status uint8
