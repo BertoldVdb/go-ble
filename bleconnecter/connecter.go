@@ -51,18 +51,28 @@ type BLEConnection struct {
 	peerAddrCandidates []bleutil.BLEAddr
 	peerAddr           bleutil.BLEAddr
 
-	isCentral bool
+	isCentral   bool
+	ownAddrType bleutil.MacAddrType
 
 	parametersMutex  sync.RWMutex
 	parametersActual BLEConnectionParametersActual
 }
 
 func (c *BLEConnection) LocalAddr() net.Addr {
-	return c.connecter.ctrl.Info.BdAddr.BDADDR
+	return c.connecter.ctrl.GetOwnAddress(c.ownAddrType)
 }
 
 func (c *BLEConnection) RemoteAddr() net.Addr {
 	return c.peerAddr
+}
+
+func (c *BLEConnection) Encrypt(ediv uint16, rand uint64, ltk [16]byte) error {
+	return c.connecter.ctrl.Cmds.LEEnableEncryptionSync(hcicommands.LEEnableEncryptionInput{
+		ConnectionHandle:     c.event.ConnectionHandle,
+		EncryptedDiversifier: ediv,
+		RandomNumber:         rand,
+		LongTermKey:          ltk,
+	})
 }
 
 func New(logger *logrus.Entry, ctrl *hci.Controller, advertiser *bleadvertiser.BLEAdvertiser, config *BLEConnecterConfig) *BLEConnecter {
@@ -199,10 +209,18 @@ func (c *BLEConnecter) Connect(ctx context.Context, isCentral bool, peerAddrs []
 
 	c.logger.WithField("0addr", peerAddrs).Debug("Starting connection")
 
+	var ownAddrType bleutil.MacAddrType
+	if isCentral {
+		ownAddrType = c.ctrl.GetLERecommenedOwnAddrType(hci.LEAddrUsageConnect)
+	} else {
+		ownAddrType = c.ctrl.GetLERecommenedOwnAddrType(hci.LEAddrUsageAdvertise)
+	}
+
 	conn := &BLEConnection{
 		connecter:          c,
 		isCentral:          isCentral,
 		peerAddrCandidates: peerAddrs,
+		ownAddrType:        ownAddrType,
 	}
 
 	request.makeValid()
@@ -247,7 +265,7 @@ func (c *BLEConnecter) Connect(ctx context.Context, isCentral bool, peerAddrs []
 			LEScanInterval:        0x10, /* Scan all the time */
 			LEScanWindow:          0x10,
 			InitiatorFilterPolicy: 1, /* Use allowlist */
-			OwnAddressType:        c.ctrl.GetLERecommenedOwnAddrType(hci.LEAddrUsageConnect),
+			OwnAddressType:        conn.ownAddrType,
 
 			ConnectionIntervalMin: request.ConnectionIntervalMin,
 			ConnectionIntervalMax: request.ConnectionIntervalMax,

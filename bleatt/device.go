@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -17,14 +18,19 @@ import (
 type GattDevice struct {
 	config *GattDeviceConfig
 
-	connsMutex sync.Mutex
-	conns      map[hciconnmgr.BufferConn](*gattDeviceConn)
+	connsMutex  sync.Mutex
+	conns       map[hciconnmgr.BufferConn](*gattDeviceConn)
+	initialConn *gattDeviceConn
 
 	ourMTU uint16
 
 	server attServer
 
-	remoteDiscoverOnce sync.Once
+	//You only need to use either the done channel or the mutex
+	clientStructureMutex        sync.Mutex
+	clientStructureDiscoverOnce sync.Once
+	clientDiscoveryDone         chan (struct{})
+	clientStructure             *attstructure.Structure
 }
 
 type gattDeviceConn struct {
@@ -51,6 +57,7 @@ func DefaultConfig() *GattDeviceConfig {
 	return &GattDeviceConfig{
 		MTU:                     0xFFFF,
 		DiscoverRemoteOnConnect: true,
+		DeviceName:              "go-ble device",
 	}
 }
 
@@ -60,9 +67,10 @@ func NewGattDevice(externalStructure *attstructure.Structure, config *GattDevice
 	}
 
 	dev := &GattDevice{
-		conns:  make(map[hciconnmgr.BufferConn](*gattDeviceConn)),
-		ourMTU: 0xFFFF,
-		config: config,
+		conns:               make(map[hciconnmgr.BufferConn](*gattDeviceConn)),
+		ourMTU:              0xFFFF,
+		config:              config,
+		clientDiscoveryDone: make(chan (struct{})),
 	}
 
 	gattStructure := attstructure.NewStructure()
@@ -84,6 +92,11 @@ func NewGattDevice(externalStructure *attstructure.Structure, config *GattDevice
 }
 
 func (d *gattDeviceConn) handlePDU(buf *pdu.PDU) (bool, error) {
+	if buf == nil {
+		d.client.close()
+		return false, nil
+	}
+
 	valid, method, isAuthenticated, isForServer := getOpcode(buf)
 	if !valid {
 		d.logger.WithFields(logrus.Fields{
@@ -95,13 +108,13 @@ func (d *gattDeviceConn) handlePDU(buf *pdu.PDU) (bool, error) {
 		return false, nil
 	}
 
-	if d.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+	if d.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
 		d.logger.WithFields(logrus.Fields{
 			"0method":      method,
 			"1isAuth":      isAuthenticated,
 			"2isForServer": isForServer,
 			"3buf":         buf,
-		}).Debug("ATT Received")
+		}).Trace("ATT Received")
 	}
 
 	buf.DropLeft(1)
@@ -121,6 +134,7 @@ func (d *gattDeviceConn) handleConn() error {
 	for {
 		buf, err := d.conn.ReadBuffer(ctx)
 		if err != nil {
+			d.handlePDU(nil)
 			return err
 		}
 
@@ -167,6 +181,11 @@ func (g *GattDevice) AddConn(conn hciconnmgr.BufferConn) error {
 	d.client.init(d)
 
 	g.connsMutex.Lock()
+	initial := false
+	if g.initialConn == nil { //This is the connection that is always present
+		g.initialConn = d
+		initial = true
+	}
 	g.conns[conn] = d
 	if g.config.ConnCb != nil {
 		g.config.ConnCb(len(g.conns))
@@ -175,8 +194,8 @@ func (g *GattDevice) AddConn(conn hciconnmgr.BufferConn) error {
 
 	go d.handleConn()
 	go d.getMTUBlocking()
-	if d.parent.config.DiscoverRemoteOnConnect {
-		go d.client.discoverRemoteDeviceStructure()
+	if initial && d.parent.config.DiscoverRemoteOnConnect {
+		go g.clientDiscover(d)
 	}
 
 	return nil
@@ -187,7 +206,7 @@ func (d *gattDeviceConn) getMTUBlocking() int {
 		buf := bleutil.GetBuffer(3)
 		buf.Buf()[0] = byte(ATTExchangeMTUReq)
 		binary.LittleEndian.PutUint16(buf.Buf()[1:], d.parent.ourMTU)
-		cmd, response, err := d.client.sendCommand(context.Background(), buf)
+		cmd, response, err := d.client.sendCommand(context.Background(), buf, true)
 		defer bleutil.ReleaseBuffer(response)
 
 		if err == nil && cmd == ATTExchangeMTURsp && response.Len() == 2 {
@@ -232,6 +251,56 @@ func (d *GattDevice) getConnWithHighestMTU() *gattDeviceConn {
 	}
 	d.connsMutex.Unlock()
 	return conn
+}
+
+func (d *GattDevice) clientDiscover(conn *gattDeviceConn) {
+	s, err := conn.client.discoverRemoteDeviceStructure()
+
+	if err != nil {
+		conn.logger.WithError(err).Warn("Failed to parse remote GATT definition")
+	} else {
+		conn.logger.Info("Discovery completed")
+		for _, m := range strings.Split(s.String(), "\n") {
+			conn.logger.Debugf("GATT: %s", strings.Trim(m, "\r\n"))
+		}
+	}
+
+	d.clientStructureMutex.Lock()
+	defer d.clientStructureMutex.Unlock()
+	d.clientStructure = s
+	close(d.clientDiscoveryDone)
+}
+
+func (d *GattDevice) ClientGetStructure(ctx context.Context) *attstructure.Structure {
+	select {
+	case <-d.clientDiscoveryDone:
+		return d.clientStructure
+	case <-ctx.Done():
+		return nil
+	}
+}
+
+func (d *GattDevice) ClientRead(ctx context.Context, handle uint16, buf []byte) ([]byte, error) {
+	//TODO: Allow using another connection for client requests
+	conn := d.initialConn
+
+	result, atterr, err := conn.client.readHandleAll(ctx, handle, buf)
+	if err != nil {
+		return nil, err
+	}
+	err = attErrorToError(atterr)
+	return result, err
+}
+
+func (d *GattDevice) ClientWrite(ctx context.Context, handle uint16, buf []byte, withRsp bool) (int, error) {
+	conn := d.initialConn
+
+	l, atterr, err := conn.client.writeHandle(ctx, handle, buf, withRsp)
+	if err != nil {
+		return l, err
+	}
+	err = attErrorToError(atterr)
+	return l, err
 }
 
 /* Note that this is just an indication, the real MTU may be different */

@@ -2,6 +2,7 @@ package hciconnmgr
 
 import (
 	"errors"
+	"log"
 	"sync"
 
 	"github.com/BertoldVdb/go-misc/closeflag"
@@ -67,6 +68,17 @@ func (c *ConnectionManager) disconnectionCompleteHandler(event *hcievents.Discon
 	return event
 }
 
+func (c *ConnectionManager) encryptionChangeHandler(event *hcievents.EncryptionChangeEvent) *hcievents.EncryptionChangeEvent {
+	log.Printf("Encryption change: %+v", event)
+	return event
+}
+
+func (c *ConnectionManager) encryptionKeyRefreshHandler(event *hcievents.EncryptionKeyRefreshCompleteEvent) *hcievents.EncryptionKeyRefreshCompleteEvent {
+	log.Printf("Encryption refresh: %+v", event)
+
+	return event
+}
+
 func (c *ConnectionManager) FindConnectionByHandle(handle uint16) *Connection {
 	c.RLock()
 	conn := c.connections[handle]
@@ -88,15 +100,24 @@ func (c *ConnectionManager) closeAll() {
 	}
 }
 
-func (c *ConnectionManager) Run() error {
+func (c *ConnectionManager) Run(readyCb func()) error {
 	defer c.useWg.Wait()
+	defer c.closeAll()
 
 	err := c.Events.SetDisconnectionCompleteEventCallback(c.disconnectionCompleteHandler)
 	if err != nil {
 		return err
 	}
 
-	defer c.closeAll()
+	err = c.Events.SetEncryptionChangeEventCallback(c.encryptionChangeHandler)
+	if err != nil {
+		return err
+	}
+
+	err = c.Events.SetEncryptionKeyRefreshCompleteEventCallback(c.encryptionKeyRefreshHandler)
+	if err != nil {
+		return err
+	}
 
 	/* Broadcom chips seem to encode the ack message incorrectly, detect that here */
 	version, err := c.Cmds.InformationalReadLocalVersionInformationSync(nil)
@@ -107,7 +128,7 @@ func (c *ConnectionManager) Run() error {
 		}
 	}
 
-	err = c.runSlotManagers()
+	err = c.runSlotManagers(readyCb)
 	if err != nil {
 		return err
 	}

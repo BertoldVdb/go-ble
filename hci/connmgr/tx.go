@@ -215,7 +215,7 @@ func (c *ConnectionManager) packetCompleteHandler(event *hcievents.NumberOfCompl
 	return event
 }
 
-func (c *ConnectionManager) runSlotManagers() error {
+func (c *ConnectionManager) runSlotManagers(readyCb func()) error {
 	bbuf, err := c.Cmds.InformationalReadBufferSizeSync(nil)
 	/* If this errored the controller supports LE only */
 	if err == nil {
@@ -276,6 +276,8 @@ func (c *ConnectionManager) runSlotManagers() error {
 	if c.txSlotManagerLEACL != c.txSlotManagerEDRACL {
 		startWorker(c.txSlotManagerLEACL)
 	}
+
+	readyCb()
 
 	wg.Wait()
 

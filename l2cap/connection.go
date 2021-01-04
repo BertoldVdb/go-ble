@@ -107,6 +107,10 @@ func (c *L2Connection) UseDone() {
 	c.l.conn.UseDone()
 }
 
+func (c *L2Connection) ParentConn() hciconnmgr.BufferConn {
+	return c.l.conn
+}
+
 func (c *L2Connection) connectionRxHandler(cid uint16, buf *pdu.PDU) (error, bool) {
 	if buf == nil {
 		return c.Close(), false

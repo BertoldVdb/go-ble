@@ -1442,6 +1442,7 @@ c|8|24|LE Enable Encryption|0x0019
  |3|Connection_Handle|2|
  |3|Random_Number|8|
  |3|Encrypted_Diversifier|2|
+ |3|Long_Term_Key|16|
  |5|HCI_Command_Status
 
 c|8|25|LE Long Term Key Request Reply|0x001A

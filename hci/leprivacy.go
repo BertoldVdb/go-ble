@@ -35,6 +35,23 @@ func (c *Controller) GetLERecommenedOwnAddrType(usage LEAddrUsage) bleutil.MacAd
 	return 0
 }
 
+func (c *Controller) GetOwnAddress(t bleutil.MacAddrType) bleutil.BLEAddr {
+	result := bleutil.BLEAddr{
+		MacAddrType: t,
+	}
+
+	switch t {
+	case bleutil.MacAddrPublic:
+		result.MacAddr = c.Info.BdAddr.BDADDR
+	case bleutil.MacAddrRandom:
+		result.MacAddr = c.Info.RandomAddr
+	default:
+		panic("Unsupported address type")
+	}
+
+	return result
+}
+
 func (c *Controller) setLERandomAddress() error {
 	/* Read 48 random bits */
 	var rnd [8]byte

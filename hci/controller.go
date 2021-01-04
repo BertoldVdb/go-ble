@@ -121,7 +121,7 @@ func New(logger *logrus.Entry, dev hciinterface.HCIInterface, config *Controller
 	}, func() error {
 		return c.Cmds.BasebandResetSync()
 	})
-	c.multirun.RegisterRunnable(c.ConnMgr)
+	c.multirun.RegisterRunnableReady(c.ConnMgr)
 
 	return c
 }

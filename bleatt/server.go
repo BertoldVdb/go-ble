@@ -551,13 +551,9 @@ func (a *attServer) characteristicNotify(ctx context.Context, characteristic *at
 
 	_, bytes := a.addPayload(conn, buf, value)
 
-	if cmd == ATTHandleValueIND {
-		_, resp, err := conn.client.sendCommand(ctx, buf)
-		bleutil.ReleaseBuffer(resp)
-		return bytes, err
-	}
-
-	return bytes, a.write(conn, buf)
+	_, resp, err := conn.client.sendCommand(ctx, buf, cmd == ATTHandleValueIND)
+	bleutil.ReleaseBuffer(resp)
+	return bytes, err
 }
 
 func (a *attServer) write(conn *gattDeviceConn, buf *pdu.PDU) error {

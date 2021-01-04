@@ -1282,6 +1282,7 @@ type LEEnableEncryptionInput struct {
 	ConnectionHandle uint16
 	RandomNumber uint64
 	EncryptedDiversifier uint16
+	LongTermKey [16]byte
 }
 
 func (i LEEnableEncryptionInput) encode(data []byte) []byte {
@@ -1289,6 +1290,7 @@ func (i LEEnableEncryptionInput) encode(data []byte) []byte {
 	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
 	binary.LittleEndian.PutUint64(w.Put(8), i.RandomNumber)
 	binary.LittleEndian.PutUint16(w.Put(2), i.EncryptedDiversifier)
+	copy(w.Put(16), i.LongTermKey[:])
 	return w.Data
 }
 

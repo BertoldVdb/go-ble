@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 	"sync"
 	"time"
 
@@ -47,25 +48,29 @@ func (a *attClient) init(parent *gattDeviceConn) error {
 	return nil
 }
 
-func (a *attClient) sendCommand(ctx context.Context, cmd *pdu.PDU) (ATTCommand, *pdu.PDU, error) {
+func (a *attClient) sendCommand(ctx context.Context, cmd *pdu.PDU, withReply bool) (ATTCommand, *pdu.PDU, error) {
 	slot, err := a.cmdmgr.Get(ctx)
 	if err != nil {
 		return 0, nil, err
 	}
 	defer a.cmdmgr.Put(slot)
+	if !withReply {
+		return 0, nil, a.write(cmd, false)
+	}
+
 	slot.Activate()
 
 	err = a.write(cmd, true)
 	if err != nil {
+		slot.Deactivate()
 		return 0, nil, err
 	}
 
 	_, err = slot.WaitCtx(ctx)
+	slot.Deactivate()
 	if err != nil {
 		return 0, nil, err
 	}
-
-	slot.Deactivate()
 
 	data := slot.Data.(*attClientCmdData)
 	return data.method, data.buf, nil
@@ -73,7 +78,7 @@ func (a *attClient) sendCommand(ctx context.Context, cmd *pdu.PDU) (ATTCommand, 
 
 func (a *attClient) sendCommandErrRsp(ctx context.Context, req *pdu.PDU) (ATTCommand, *pdu.PDU, ATTError, error) {
 	method := req.Buf()[0]
-	cmd, response, err := a.sendCommand(ctx, req)
+	cmd, response, err := a.sendCommand(ctx, req, true)
 	if cmd == ATTErrorRsp {
 		data := response.DropLeft(4)
 		defer bleutil.ReleaseBuffer(response)
@@ -89,34 +94,56 @@ func (a *attClient) sendCommandErrRsp(ctx context.Context, req *pdu.PDU) (ATTCom
 }
 
 func (a *attClient) write(buf *pdu.PDU, expectReply bool) error {
-	if a.parent.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+	if a.parent.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
 		a.parent.logger.WithFields(logrus.Fields{
 			"0buf":         buf,
 			"1expectReply": expectReply,
-		}).Debug("ATT Client Write")
+		}).Trace("ATT Client Write")
 	}
 
 	if expectReply {
 		a.timeoutTimerMutex.Lock()
-		a.timeoutTimer.Reset(10 * time.Second)
+		a.timeoutTimer.Reset(30 * time.Second)
 		a.timeoutTimerMutex.Unlock()
 	}
 
 	return a.parent.conn.WriteBuffer(buf)
 }
 
+func (a *attClient) handleNotify(handle uint16, data []byte) {
+	a.parent.parent.clientStructureMutex.Lock()
+	structure := a.parent.parent.clientStructure
+	a.parent.parent.clientStructureMutex.Unlock()
+
+	if structure != nil {
+		structure.InjectNotify(handle, data)
+	}
+}
+
 func (a *attClient) handleNTFIND(method ATTCommand, buf *pdu.PDU) (bool, error) {
 	if method == ATTMultipleHandleValueNTF {
-		for data := buf.DropLeft(4); data != nil; data = buf.DropLeft(4) {
-			handle := binary.LittleEndian.Uint16(data)
-			// The other 2 bytes contain the length of the data. It is not important for us
-
-			if a.parent.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
-				a.parent.logger.WithFields(logrus.Fields{
-					"0handle": handle,
-				}).Trace("Got mutli notification")
+		for {
+			hdr := buf.DropLeft(4)
+			if hdr == nil {
+				break
 			}
 
+			handle := binary.LittleEndian.Uint16(hdr)
+			dlen := binary.LittleEndian.Uint16(hdr[2:])
+
+			data := buf.DropLeft(int(dlen))
+			if hdr == nil {
+				break
+			}
+
+			if a.parent.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+				a.parent.logger.WithFields(logrus.Fields{
+					"0handle": handle,
+					"1data":   hex.EncodeToString(data),
+				}).Debug("Got mutli notification")
+			}
+
+			a.handleNotify(handle, data)
 		}
 
 		return false, nil
@@ -127,15 +154,23 @@ func (a *attClient) handleNTFIND(method ATTCommand, buf *pdu.PDU) (bool, error) 
 		handle := binary.LittleEndian.Uint16(handleBuf)
 		isIndication := method == ATTHandleValueIND
 
-		if a.parent.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		if a.parent.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
 			a.parent.logger.WithFields(logrus.Fields{
 				"0handle":       handle,
 				"1isIndication": isIndication,
 				"2data":         buf,
-			}).Trace("Got notification")
+			}).Debug("Got notification")
 		}
 
-		return true, nil
+		a.handleNotify(handle, buf.Buf())
+
+		if isIndication {
+			/* Confirm notification */
+			buf.Reset()
+			buf.Append(byte(ATTHandleValueCNF))
+			a.write(buf, false)
+			return true, nil
+		}
 	}
 
 	return false, nil
@@ -151,23 +186,19 @@ func (a *attClient) handleTimeout() {
 	<-t.C
 }
 
+func (a *attClient) close() {
+	a.cmdmgr.Close()
+}
+
 func (a *attClient) handlePDU(method ATTCommand, isAuthenticated bool, buf *pdu.PDU) (bool, error) {
 	switch method {
 	case ATTMultipleHandleValueNTF:
-		return a.handleNTFIND(method, buf)
+		fallthrough
 	case ATTHandleValueNTF:
+		fallthrough
+	case ATTHandleValueIND:
 		return a.handleNTFIND(method, buf)
 
-	case ATTHandleValueIND:
-		keepBuffer, err := a.handleNTFIND(method, buf)
-		if err != nil {
-			return false, err
-		}
-
-		/* Confirm notification */
-		rsp := bleutil.GetBuffer(1)
-		rsp.Buf()[0] = byte(ATTHandleValueCNF)
-		return keepBuffer, a.write(rsp, false)
 	default:
 		a.timeoutTimerMutex.Lock()
 		a.timeoutTimer.Stop()
@@ -193,7 +224,7 @@ func (a *attClient) findInformation(ctx context.Context, startingHandle uint16, 
 	binary.LittleEndian.PutUint16(buf.Buf()[1:], startingHandle)
 	binary.LittleEndian.PutUint16(buf.Buf()[3:], endingHandle)
 
-	cmd, response, err := a.sendCommand(ctx, buf)
+	cmd, response, err := a.sendCommand(ctx, buf, true)
 	defer bleutil.ReleaseBuffer(response)
 
 	if err != nil || cmd != ATTFindInformationRsp {
@@ -255,6 +286,31 @@ main:
 	}
 
 	return result, nil
+}
+
+func (a *attClient) writeHandle(ctx context.Context, handle uint16, value []byte, withRsp bool) (int, ATTError, error) {
+	mtu := a.parent.getMTU()
+
+	if len(value) > mtu-3 {
+		value = value[:mtu-3]
+	}
+
+	buf := bleutil.GetBuffer(3 + len(value))
+	binary.LittleEndian.PutUint16(buf.Buf()[1:], handle)
+	copy(buf.Buf()[3:], value)
+
+	if withRsp {
+		buf.Buf()[0] = byte(ATTWriteReq)
+
+		_, buf, atterr, err := a.sendCommandErrRsp(ctx, buf)
+		bleutil.ReleaseBuffer(buf)
+
+		return len(value), atterr, err
+	}
+
+	buf.Buf()[0] = byte(ATTWriteCMD)
+	_, _, err := a.sendCommand(ctx, buf, false)
+	return len(value), 0, err
 }
 
 func (a *attClient) readHandle(ctx context.Context, handle uint16, result []byte) ([]byte, ATTError, error) {
@@ -343,46 +399,50 @@ func (a *attClient) readByUUID(ctx context.Context, uuid bleutil.UUID, result []
 	return a.readHandleAll(ctx, handle, result)
 }
 
-func (a *attClient) discoverRemoteDeviceStructure() {
-	/* This is the same for all clients on one device */
-	a.parent.parent.remoteDiscoverOnce.Do(func() {
-		/* With a high MTU this goes so much faster */
-		a.parent.getMTUBlocking()
+func attErrorToError(atterr ATTError) error {
+	if atterr == 0 {
+		return nil
+	}
 
-		ctx := context.Background()
+	return fmt.Errorf("ATT Error: %d", atterr)
+}
 
-		handles, err := a.findInformationAll(ctx, 1, 0xFFFF)
-		if err != nil {
-			return
+func (a *attClient) discoverRemoteDeviceStructure() (*attstructure.Structure, error) {
+	/* With a high MTU this goes so much faster */
+	a.parent.getMTUBlocking()
+
+	ctx := context.Background()
+
+	handles, err := a.findInformationAll(ctx, 1, 0xFFFF)
+	if err != nil {
+		return nil, err
+	}
+
+	var gattHandles []*attstructure.GATTHandle
+	for _, m := range handles {
+		handle := &attstructure.GATTHandle{
+			Info: m,
 		}
 
-		var gattHandles []*attstructure.GATTHandle
-		for _, m := range handles {
-			handle := &attstructure.GATTHandle{
-				Info: m,
+		/* If it is descriptive, try to read it */
+		if isPartOfGATTDatabase(m.UUID) > 0 {
+			value, attErr, err := a.readHandleAll(ctx, m.Handle, nil)
+			if attErr > 0 || err != nil {
+				return nil, err
 			}
-
-			/* If it is descriptive, try to read it */
-			if isPartOfGATTDatabase(m.UUID) > 0 {
-				value, attErr, err := a.readHandleAll(ctx, m.Handle, nil)
-				if attErr > 0 || err != nil {
-					return
-				}
-				handle.Value = value
-			}
-
-			gattHandles = append(gattHandles, handle)
+			handle.Value = value
 		}
 
-		for _, m := range gattHandles {
-			a.parent.logger.WithFields(logrus.Fields{
-				"1uuid":   m.Info.UUID,
-				"0handle": m.Info.Handle,
-				"2data":   hex.EncodeToString(m.Value),
-			}).Debug("Discovered characteristic")
-		}
+		gattHandles = append(gattHandles, handle)
+	}
 
-		//TODO: Removed for quick push (this code is not releasable yet)
-		//a.parent.notifyStructure(gattHandles)
-	})
+	for _, m := range gattHandles {
+		a.parent.logger.WithFields(logrus.Fields{
+			"1uuid":   m.Info.UUID,
+			"0handle": m.Info.Handle,
+			"2data":   hex.EncodeToString(m.Value),
+		}).Debug("Discovered characteristic")
+	}
+
+	return attstructure.ImportStructure(gattHandles, a.parent.parent.ClientRead, a.parent.parent.ClientWrite)
 }
