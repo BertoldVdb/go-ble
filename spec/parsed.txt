@@ -2193,3 +2193,14 @@ c|8|121|LE Set Transmit Power Reporting Enable|0x007A
  |4|Status|1|
  |4|Connection_Handle|2|
  |5|HCI_Command_Complete
+c|63|121|CypressSetTxPwr|0x0026
+ |3|Connection_Handle|2|
+ |3|TX_Power|1|
+ |4|Status|1|
+ |5|HCI_Command_Complete
+
+c|63|121|CypressSetBDAddr|0x0001
+ |3|Static_Address|6|
+ |4|Status|1|
+ |5|HCI_Command_Complete
+

@@ -2,7 +2,6 @@ package hciconnmgr
 
 import (
 	"errors"
-	"log"
 	"sync"
 
 	"github.com/BertoldVdb/go-misc/closeflag"
@@ -12,17 +11,25 @@ import (
 	hcicommands "github.com/BertoldVdb/go-ble/hci/commands"
 	hciinterface "github.com/BertoldVdb/go-ble/hci/drivers/interface"
 	hcievents "github.com/BertoldVdb/go-ble/hci/events"
+	deviceinfo "github.com/BertoldVdb/go-ble/hci/information"
 )
+
+type ConnectionManagerConfig struct {
+	HookConnectionStateChange func(c *Connection, open bool)
+}
 
 type ConnectionManager struct {
 	sync.RWMutex
 	multirun.Runnable
+
+	config *ConnectionManagerConfig
 
 	closeflag closeflag.CloseFlag
 
 	logger   *logrus.Entry
 	Cmds     *hcicommands.Commands
 	Events   *hcievents.EventHandler
+	info     *deviceinfo.ControllerInfo
 	sendFunc func(data []byte) error
 
 	connections map[uint16]*Connection
@@ -41,12 +48,19 @@ var (
 	ErrorConnectionClosed = errors.New("The connection is not open")
 )
 
-func New(logger *logrus.Entry, cmds *hcicommands.Commands, events *hcievents.EventHandler, sendFunc func(data []byte) error) *ConnectionManager {
+func DefaultConfig() *ConnectionManagerConfig {
+	return &ConnectionManagerConfig{}
+}
+
+func New(logger *logrus.Entry, cmds *hcicommands.Commands, events *hcievents.EventHandler, config *ConnectionManagerConfig, info *deviceinfo.ControllerInfo, sendFunc func(data []byte) error) *ConnectionManager {
 	return &ConnectionManager{
+		config: config,
+
 		logger:   logger,
 		Cmds:     cmds,
 		Events:   events,
 		sendFunc: sendFunc,
+		info:     info,
 
 		connections: make(map[uint16]*Connection),
 	}
@@ -69,12 +83,12 @@ func (c *ConnectionManager) disconnectionCompleteHandler(event *hcievents.Discon
 }
 
 func (c *ConnectionManager) encryptionChangeHandler(event *hcievents.EncryptionChangeEvent) *hcievents.EncryptionChangeEvent {
-	log.Printf("Encryption change: %+v", event)
+	logrus.Printf("Encryption change: %+v", event)
 	return event
 }
 
 func (c *ConnectionManager) encryptionKeyRefreshHandler(event *hcievents.EncryptionKeyRefreshCompleteEvent) *hcievents.EncryptionKeyRefreshCompleteEvent {
-	log.Printf("Encryption refresh: %+v", event)
+	logrus.Printf("Encryption refresh: %+v", event)
 
 	return event
 }
@@ -120,12 +134,9 @@ func (c *ConnectionManager) Run(readyCb func()) error {
 	}
 
 	/* Broadcom chips seem to encode the ack message incorrectly, detect that here */
-	version, err := c.Cmds.InformationalReadLocalVersionInformationSync(nil)
-	if err == nil {
-		if version.ManufacturerName == 15 {
-			c.logger.Warn("Detected Broadcom chip: using TX quirk.")
-			c.useBroadcomQuirk = true
-		}
+	if c.info.LocalVersionInformation.ManufacturerName == 15 {
+		c.logger.Warn("Detected Broadcom chip: using TX quirk.")
+		c.useBroadcomQuirk = true
 	}
 
 	err = c.runSlotManagers(readyCb)

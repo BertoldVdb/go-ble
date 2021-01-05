@@ -60,6 +60,7 @@ sub getTopic{
     if ($id == 6) { return "Testing"; }
     if ($id == 7) { return ""; }
     if ($id == 8) { return ""; } #The command already has a prefix 
+    if ($id == 63) { return "Vendor"; }
     return "Unknown"
 }
 

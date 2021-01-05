@@ -10,6 +10,7 @@ import (
 	hciconnmgr "github.com/BertoldVdb/go-ble/hci/connmgr"
 	hciinterface "github.com/BertoldVdb/go-ble/hci/drivers/interface"
 	hcievents "github.com/BertoldVdb/go-ble/hci/events"
+	deviceinfo "github.com/BertoldVdb/go-ble/hci/information"
 	bleutil "github.com/BertoldVdb/go-ble/util"
 	"github.com/BertoldVdb/go-misc/closeflag"
 	"github.com/BertoldVdb/go-misc/multirun"
@@ -32,7 +33,7 @@ type Controller struct {
 	Events    *hcievents.EventHandler
 	ConnMgr   *hciconnmgr.ConnectionManager
 
-	Info ControllerInfo
+	Info deviceinfo.ControllerInfo
 
 	multirun multirun.MultiRun
 }
@@ -44,6 +45,10 @@ type ControllerConfig struct {
 	PrivacyConnect   bool
 	PrivacyScan      bool
 	PrivacyAdvertise bool
+
+	HookInitDevice func(ctrl *Controller) error
+
+	ConnectionManagerConfig *hciconnmgr.ConnectionManagerConfig
 }
 
 func DefaultConfig() *ControllerConfig {
@@ -54,15 +59,9 @@ func DefaultConfig() *ControllerConfig {
 		PrivacyConnect:   true,
 		PrivacyScan:      true,
 		PrivacyAdvertise: true,
-	}
-}
 
-type ControllerInfo struct {
-	SupportedCommands   *hcicommands.InformationalReadLocalSupportedCommandsOutput
-	SupportedFeatures   *hcicommands.InformationalReadLocalSupportedFeaturesOutput
-	LESupportedFeatures *hcicommands.LEReadLocalSupportedFeaturesOutput
-	BdAddr              *hcicommands.InformationalReadBDADDROutput
-	RandomAddr          bleutil.MacAddr
+		ConnectionManagerConfig: hciconnmgr.DefaultConfig(),
+	}
 }
 
 func New(logger *logrus.Entry, dev hciinterface.HCIInterface, config *ControllerConfig) *Controller {
@@ -87,7 +86,7 @@ func New(logger *logrus.Entry, dev hciinterface.HCIInterface, config *Controller
 	c.Hcicmdmgr = hcicmdmgr.New(bleutil.LogWithPrefix(logger, "cmdmgr"), []int{10}, config.AwaitStartup, sendFunc)
 	c.Cmds = hcicommands.New(bleutil.LogWithPrefix(logger, "cmds"), c.Hcicmdmgr)
 	c.Events = hcievents.New(bleutil.LogWithPrefix(logger, "events"), c.Hcicmdmgr, c.Cmds)
-	c.ConnMgr = hciconnmgr.New(bleutil.LogWithPrefix(logger, "connmgr"), c.Cmds, c.Events, sendFunc)
+	c.ConnMgr = hciconnmgr.New(bleutil.LogWithPrefix(logger, "connmgr"), c.Cmds, c.Events, config.ConnectionManagerConfig, &c.Info, sendFunc)
 
 	c.dev.SetRecvHandler(func(rxPkt hciinterface.HCIRxPacket) error {
 		if rxPkt.Received == false {
@@ -132,6 +131,18 @@ func (c *Controller) configureDevice() error {
 		return err
 	}
 
+	if c.config.HookInitDevice != nil {
+		err = c.config.HookInitDevice(c)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = c.Info.Read(c.Cmds)
+	if err != nil {
+		return err
+	}
+
 	/* Quirk: Should not be needed unless we support EDR as well, but some controllers
 	   require it to work with extended LE commands at all */
 	c.Cmds.BasebandWriteLEHostSupportSync(hcicommands.BasebandWriteLEHostSupportInput{
@@ -141,29 +152,8 @@ func (c *Controller) configureDevice() error {
 	/* Packet based flow control */
 	c.Cmds.BasebandWriteFlowControlModeSync(hcicommands.BasebandWriteFlowControlModeInput{})
 
-	c.Info.BdAddr, err = c.Cmds.InformationalReadBDADDRSync(nil)
-	if err != nil {
-		return err
-	}
-
 	/* Setup the privacy address */
-	err = c.setLERandomAddress()
-	if err != nil {
-		return err
-	}
-
-	c.Info.SupportedCommands, err = c.Cmds.InformationalReadLocalSupportedCommandsSync(nil)
-	if err != nil {
-		return err
-	}
-
-	c.Info.SupportedFeatures, err = c.Cmds.InformationalReadLocalSupportedFeaturesSync(nil)
-	if err != nil {
-		return err
-	}
-
-	c.Info.LESupportedFeatures, err = c.Cmds.LEReadLocalSupportedFeaturesSync(nil)
-	return err
+	return c.setLERandomAddress()
 }
 
 func (c *Controller) Run(ready func()) error {

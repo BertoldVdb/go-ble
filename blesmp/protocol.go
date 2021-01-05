@@ -3,10 +3,10 @@ package blesmp
 import (
 	"encoding/binary"
 	"encoding/hex"
-	"log"
 
 	bleutil "github.com/BertoldVdb/go-ble/util"
 	pdu "github.com/BertoldVdb/go-misc/pdubuf"
+	"github.com/sirupsen/logrus"
 
 	crand "crypto/rand"
 	"crypto/subtle"
@@ -39,13 +39,13 @@ type smpProtocol struct {
 	/* Key distribution */
 	pairingLTKComplete bool
 	pairingLTKValid    bool
-	pairingLTK         [16]byte
 	pairingEDIVValid   bool
-	pairingEDIV        uint16
-	pairingRand        uint64
+	pairingLTK         smpStoredLTK
 }
 
 func (c *SMPConn) sendPairingRequest(authReq byte) {
+	c.updateTimeout(true)
+
 	c.protocol.state = smpWaitPairingResponse
 	c.protocol.pairingLTKValid = false
 	c.protocol.pairingEDIVValid = false
@@ -67,16 +67,21 @@ func (c *SMPConn) sendPairingRequest(authReq byte) {
 	c.conn.WriteBuffer(buf)
 }
 
-func (c *SMPConn) sendPairingFailed(reason psmFailedReason) {
-	log.Println("Pairing failed", reason, c.protocol.state)
-	//TODO: signal higher layers
+func (c *SMPConn) signalPairingFailed(reason psmFailedReason) {
+	c.logger.WithFields(logrus.Fields{"0reason": reason, "1state": c.protocol.state}).Warn("Pairing failed")
 	c.protocol.state = smpWaitStart
+	c.updateTimeout(false)
 
+	//TODO:signal higher layers
+}
+
+func (c *SMPConn) sendPairingFailed(reason psmFailedReason) {
 	buf := bleutil.GetBuffer(2)
 	buf.Buf()[0] = byte(opcodePairingFailed)
 	buf.Buf()[1] = byte(reason)
 	c.conn.WriteBuffer(buf)
 
+	c.signalPairingFailed(reason)
 }
 
 func (c *SMPConn) handleSecurityRequest(authReq byte) {
@@ -84,8 +89,6 @@ func (c *SMPConn) handleSecurityRequest(authReq byte) {
 }
 
 func (c *SMPConn) handlePairingResponse(resp []byte) {
-	c.protocol.state = smpWaitPairingConfirm
-
 	copy(c.protocol.pairingResponse[:], resp)
 
 	//TODO: check IO capabilities
@@ -99,46 +102,38 @@ func (c *SMPConn) handlePairingResponse(resp []byte) {
 		return
 	}
 
-	raw := c.rawConnLE()
-	remote := raw.RemoteAddr().(bleutil.BLEAddr)
-	local := raw.LocalAddr().(bleutil.BLEAddr)
-
 	_, err := crand.Read(c.protocol.pairingIRand[:])
 	if err != nil {
 		c.sendPairingFailed(failedUnspecifiedReason)
 		return
 	}
 
-	c.protocol.pairingIConfirm = CryptoFuncC1(c.protocol.pairingTK, c.protocol.pairingIRand, c.protocol.pairingRequest, c.protocol.pairingResponse, local, remote)
+	c.protocol.pairingIConfirm = CryptoFuncC1(c.protocol.pairingTK, c.protocol.pairingIRand, c.protocol.pairingRequest, c.protocol.pairingResponse, c.addrLELocal, c.addrLERemote)
 
 	buf := bleutil.GetBuffer(1)
 	buf.Buf()[0] = byte(opcodePairingConfirm)
 	buf.Append(c.protocol.pairingIConfirm[:]...)
 	c.conn.WriteBuffer(buf)
+
+	c.protocol.state = smpWaitPairingConfirm
 }
 
 func (c *SMPConn) handlePairingConfirm(resp []byte) {
-	c.protocol.state = smpWaitPairingRandom
-
 	copy(c.protocol.pairingRConfirm[:], resp)
 
 	buf := bleutil.GetBuffer(1)
 	buf.Buf()[0] = byte(opcodePairingRandom)
 	buf.Append(c.protocol.pairingIRand[:]...)
 	c.conn.WriteBuffer(buf)
+
+	c.protocol.state = smpWaitPairingRandom
 }
 
 func (c *SMPConn) handlePairingRandom(rand []byte) {
-	c.protocol.state = smpKeyDistribution
-
 	var pairingRRand [16]byte
 	copy(pairingRRand[:], rand)
 
-	raw := c.rawConnLE()
-	remote := raw.RemoteAddr().(bleutil.BLEAddr)
-	local := raw.LocalAddr().(bleutil.BLEAddr)
-
-	tmp := CryptoFuncC1(c.protocol.pairingTK, pairingRRand, c.protocol.pairingRequest, c.protocol.pairingResponse, local, remote)
+	tmp := CryptoFuncC1(c.protocol.pairingTK, pairingRRand, c.protocol.pairingRequest, c.protocol.pairingResponse, c.addrLELocal, c.addrLERemote)
 
 	if subtle.ConstantTimeCompare(tmp[:], c.protocol.pairingRConfirm[:]) == 0 {
 		c.sendPairingFailed(failedConfirmValueFailed)
@@ -149,7 +144,14 @@ func (c *SMPConn) handlePairingRandom(rand []byte) {
 	c.protocol.pairingSTK = CryptoFuncS1(c.protocol.pairingTK, c.protocol.pairingIRand, pairingRRand)
 	c.protocol.pairingSTK = CryptoShortenKey(c.protocol.pairingSTK, c.protocol.pairingKeySize)
 
+	c.logger.WithFields(logrus.Fields{
+		"0stk": hex.EncodeToString(c.protocol.pairingSTK[:]),
+	}).Info("STK Calculated")
+
+	raw := c.rawConnLE()
 	raw.Encrypt(0, 0, c.protocol.pairingSTK)
+
+	c.protocol.state = smpKeyDistribution
 }
 
 func (c *SMPConn) handleKeyDistribution(opcode psmOpcode, data []byte) bool {
@@ -164,24 +166,34 @@ func (c *SMPConn) handleKeyDistribution(opcode psmOpcode, data []byte) bool {
 
 		c.protocol.pairingLTKComplete = true
 
-		log.Println("Received LTK", c.protocol.pairingEDIV, c.protocol.pairingRand, hex.EncodeToString(c.protocol.pairingLTK[:]))
+		c.parent.storedKeysPersist.Lock()
+		c.parent.storedKeys[makeSMPStoredLTKMapKey(c.addrLELocal, c.addrLERemote)] = c.protocol.pairingLTK
+		c.parent.storedKeysPersist.Unlock()
+		err := c.parent.storedKeysPersist.Save()
+
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			"0ediv": c.protocol.pairingLTK.EDIV,
+			"1rand": c.protocol.pairingLTK.Rand,
+			"2ltk":  hex.EncodeToString(c.protocol.pairingLTK.LTK[:]),
+		}).Info("LTK Saved")
 
 		//TODO: Using the LTK on this connection makes no sense (it is already encrypted!), it is just to test that it is correct!
-		raw := c.rawConnLE()
-		raw.Encrypt(c.protocol.pairingEDIV, c.protocol.pairingRand, c.protocol.pairingLTK)
+		//Just store it for next time: OriginatorMac/DestinationMac -> EDIV, RAND, LTK
+		//raw := c.rawConnLE()
+		//raw.Encrypt(c.protocol.pairingEDIV, c.protocol.pairingRand, c.protocol.pairingLTK)
 	}
 
 	if opcode == opcodeKDInitiatorIdentification && len(data) == 10 {
 		c.protocol.pairingEDIVValid = true
-		c.protocol.pairingEDIV = binary.LittleEndian.Uint16(data)
-		c.protocol.pairingRand = binary.LittleEndian.Uint64(data[2:])
+		c.protocol.pairingLTK.EDIV = binary.LittleEndian.Uint16(data)
+		c.protocol.pairingLTK.Rand = binary.LittleEndian.Uint64(data[2:])
 
 		handleLTK()
 		return true
 	}
 	if opcode == opcodeKDEncryptionInformation && len(data) == 16 {
 		c.protocol.pairingLTKValid = true
-		copy(c.protocol.pairingLTK[:], data)
+		copy(c.protocol.pairingLTK.LTK[:], data)
 
 		handleLTK()
 		return true
@@ -202,10 +214,7 @@ func (c *SMPConn) handleMessage(pdu *pdu.PDU) bool {
 			reason = psmFailedReason(pdu.Buf()[1])
 		}
 
-		c.protocol.state = smpWaitStart
-
-		//TODO: notify if needed
-		log.Println("Pairing failed", reason)
+		c.signalPairingFailed(reason)
 		return false
 	}
 

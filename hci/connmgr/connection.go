@@ -69,6 +69,14 @@ func (c *Connection) GetLogger() *logrus.Entry {
 	return c.connmgr.logger.WithField("zhandle", c.handle)
 }
 
+func (c *Connection) GetHandle() uint16 {
+	return c.handle
+}
+
+func (c *Connection) GetConnectionManager() *ConnectionManager {
+	return c.connmgr
+}
+
 func (c *Connection) IsOpen() bool {
 	select {
 	case <-c.closeChan:
@@ -103,6 +111,9 @@ func (c *Connection) Close() error {
 		}
 
 		c.connmgr.logger.WithError(err).WithField("0handle", c.handle).Debug("Completed disconnect")
+		if c.connmgr.config.HookConnectionStateChange != nil {
+			c.connmgr.config.HookConnectionStateChange(c, false)
+		}
 	})
 
 	return err
@@ -156,6 +167,10 @@ func (c *ConnectionManager) ConnectionNew(handle uint16, closeFunc func() error)
 	c.Unlock()
 
 	c.logger.WithField("0handle", handle).Debug("Created new connection")
+
+	if c.config.HookConnectionStateChange != nil {
+		c.config.HookConnectionStateChange(conn, true)
+	}
 
 	return conn
 }
