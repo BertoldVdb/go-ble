@@ -239,9 +239,11 @@ func (a *BLEAdvertiser) legacyAdvertisingInit() {
 		a.legacyAdvertisingScanData = make([]byte, 0, 31)
 
 		beaconData := LegacyAdvertisingData{
-			Active:   a.legacyAdvertisingAlwaysOn,
-			Type:     LegacyAdvertisementTypeScanInd,
-			AddrType: a.ctrl.GetLERecommenedOwnAddrType(hci.LEAddrUsageAdvertise),
+			Active:      a.legacyAdvertisingAlwaysOn,
+			Type:        LegacyAdvertisementTypeScanInd,
+			AddrType:    a.ctrl.GetLERecommenedOwnAddrType(hci.LEAddrUsageAdvertise),
+			IntervalMin: a.config.LegacyBaseIntervalMin,
+			IntervalMax: a.config.LegacyBaseIntervalMax,
 		}
 
 		/* TODO: Basic beacon, can be improved with bin packer utility function later */

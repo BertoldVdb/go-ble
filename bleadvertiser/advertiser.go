@@ -33,6 +33,9 @@ type BLEAdvertiserConfig struct {
 	DeviceName        string
 	DeviceService     bleutil.UUID
 	DeviceFlags       uint8
+
+	LegacyBaseIntervalMin uint16
+	LegacyBaseIntervalMax uint16
 }
 
 func DefaultConfig() *BLEAdvertiserConfig {
