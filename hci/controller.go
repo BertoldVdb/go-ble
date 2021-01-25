@@ -2,7 +2,6 @@ package hci
 
 import (
 	"encoding/hex"
-	"log"
 	"sync"
 
 	hcicmdmgr "github.com/BertoldVdb/go-ble/hci/cmdmgr"
@@ -48,6 +47,7 @@ type ControllerConfig struct {
 
 	HookInitDevice func(ctrl *Controller) error
 
+	ConnectionManagerUsed   bool
 	ConnectionManagerConfig *hciconnmgr.ConnectionManagerConfig
 }
 
@@ -60,6 +60,7 @@ func DefaultConfig() *ControllerConfig {
 		PrivacyScan:      true,
 		PrivacyAdvertise: true,
 
+		ConnectionManagerUsed:   true,
 		ConnectionManagerConfig: hciconnmgr.DefaultConfig(),
 	}
 }
@@ -86,7 +87,10 @@ func New(logger *logrus.Entry, dev hciinterface.HCIInterface, config *Controller
 	c.Hcicmdmgr = hcicmdmgr.New(bleutil.LogWithPrefix(logger, "cmdmgr"), []int{10}, config.AwaitStartup, sendFunc)
 	c.Cmds = hcicommands.New(bleutil.LogWithPrefix(logger, "cmds"), c.Hcicmdmgr)
 	c.Events = hcievents.New(bleutil.LogWithPrefix(logger, "events"), c.Hcicmdmgr, c.Cmds)
-	c.ConnMgr = hciconnmgr.New(bleutil.LogWithPrefix(logger, "connmgr"), c.Cmds, c.Events, config.ConnectionManagerConfig, &c.Info, sendFunc)
+
+	if config.ConnectionManagerUsed {
+		c.ConnMgr = hciconnmgr.New(bleutil.LogWithPrefix(logger, "connmgr"), c.Cmds, c.Events, config.ConnectionManagerConfig, &c.Info, sendFunc)
+	}
 
 	c.dev.SetRecvHandler(func(rxPkt hciinterface.HCIRxPacket) error {
 		if rxPkt.Received == false {
@@ -103,12 +107,15 @@ func New(logger *logrus.Entry, dev hciinterface.HCIInterface, config *Controller
 			return nil
 		}
 
-		if c.ConnMgr.HandleData(rxPkt) {
+		if c.ConnMgr != nil && c.ConnMgr.HandleData(rxPkt) {
 			return nil
 		}
 
-		log.Printf("Extra rx packet %+v\n", rxPkt)
-		c.dev.SendPacket(hciinterface.HCITxPacket{Data: rxPkt.Data})
+		if logger != nil && logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+			logger.WithFields(logrus.Fields{
+				"0data": hex.EncodeToString(rxPkt.Data),
+			}).Debug("Unsupported HCI packet received")
+		}
 
 		return nil
 	})
@@ -120,7 +127,10 @@ func New(logger *logrus.Entry, dev hciinterface.HCIInterface, config *Controller
 	}, func() error {
 		return c.Cmds.BasebandResetSync()
 	})
-	c.multirun.RegisterRunnableReady(c.ConnMgr)
+
+	if c.ConnMgr != nil {
+		c.multirun.RegisterRunnableReady(c.ConnMgr)
+	}
 
 	return c
 }

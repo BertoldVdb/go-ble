@@ -103,3 +103,62 @@ log:
 
 	 return err
 }
+// VendorCypressSetTxCarrierFrequencyARMInput represents the input of the command specified in Section 7.63.121
+type VendorCypressSetTxCarrierFrequencyARMInput struct {
+	CarrierEnable uint8
+	CarrierFrequency uint8
+	ModulationPattern uint8
+	ModulationType uint8
+	TransmitPower uint8
+	TransmitPowerdBm uint8
+	TransmitPowerTableIndex uint8
+}
+
+func (i VendorCypressSetTxCarrierFrequencyARMInput) encode(data []byte) []byte {
+	w := bleutil.Writer{Data: data};
+	w.PutOne(uint8(i.CarrierEnable))
+	w.PutOne(uint8(i.CarrierFrequency))
+	w.PutOne(uint8(i.ModulationPattern))
+	w.PutOne(uint8(i.ModulationType))
+	w.PutOne(uint8(i.TransmitPower))
+	w.PutOne(uint8(i.TransmitPowerdBm))
+	w.PutOne(uint8(i.TransmitPowerTableIndex))
+	return w.Data
+}
+
+// VendorCypressSetTxCarrierFrequencyARMSync executes the command specified in Section 7.63.121 synchronously
+func (c *Commands) VendorCypressSetTxCarrierFrequencyARMSync (params VendorCypressSetTxCarrierFrequencyARMInput) error {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("VendorCypressSetTxCarrierFrequencyARM started")
+	}
+	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 63, OCF: 0x0014}, nil)
+	if err != nil {
+		goto log
+	}
+
+	buffer.Buffer = params.encode(buffer.Buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	if err != nil {
+		goto log
+	}
+
+	err = HciErrorToGo(response, err)
+
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	if err2 != nil {
+		err = err2
+	}
+
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+		}).Debug("VendorCypressSetTxCarrierFrequencyARM completed")
+	}
+
+	 return err
+}
