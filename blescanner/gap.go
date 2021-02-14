@@ -132,12 +132,12 @@ func (d *BLEDevice) handleManufacturerSpecific(gap *GAPRecord) {
 		return
 	}
 
-	if d.scanner.logger != nil && d.scanner.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+	if d.scanner.logger != nil && d.scanner.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
 		d.scanner.logger.WithFields(logrus.Fields{
 			"0id":    fmt.Sprintf("0x%04x", manufacturerID),
 			"1event": gap.EventType,
 			"2data":  hex.EncodeToString(gap.Data),
-		}).Debug("Manufacturer data callback triggered")
+		}).Trace("Manufacturer data callback triggered")
 	}
 
 	cb(d, gap)

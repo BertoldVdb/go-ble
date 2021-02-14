@@ -4,10 +4,10 @@ import (
 	"context"
 	"net"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	hcicommands "github.com/BertoldVdb/go-ble/hci/commands"
+	hcievents "github.com/BertoldVdb/go-ble/hci/events"
 	bleutil "github.com/BertoldVdb/go-ble/util"
 	"github.com/BertoldVdb/go-misc/bufferfifo"
 	pdu "github.com/BertoldVdb/go-misc/pdubuf"
@@ -31,15 +31,24 @@ type BufferConn interface {
 	UseDone()
 }
 
+type EncryptionState struct {
+	Status    uint8
+	LastRekey time.Time
+	Enabled   uint8
+}
+
 type Connection struct {
 	net.PacketConn
 
 	connmgr *ConnectionManager
 	handle  uint16
 
-	txFIFO        *bufferfifo.FIFO
-	txSlotManager *txSlotManager
-	txOutstanding int32
+	txFIFO             *bufferfifo.FIFO
+	txSlotManager      *txSlotManager
+	txOutstandingMutex sync.Mutex
+	txOutstandingFlush bool
+	txOutstanding      int32
+	txLockout          bool
 
 	rxPDU          *pdu.PDU
 	rxFIFO         *bufferfifo.FIFO
@@ -55,6 +64,7 @@ type Connection struct {
 	disconnectedOnce sync.Once
 
 	AppConn AppConn
+	SMPConn interface{}
 }
 
 func (c *Connection) UseStart() {
@@ -129,7 +139,23 @@ func (c *Connection) disconnected() {
 			}
 			bleutil.ReleaseBuffer(buf)
 		}
-		c.txSlotManager.ReleaseSlots(int(atomic.SwapInt32(&c.txOutstanding, 0)))
+
+		c.txOutstandingMutex.Lock()
+		c.txOutstandingFlush = true
+		outstanding := c.txOutstanding
+		c.txOutstanding = 0
+		c.txOutstandingMutex.Unlock()
+
+		if outstanding > 0 {
+			c.txSlotManager.ReleaseSlots(int(outstanding))
+			/* When using a high-latency HCI interface, it can happen that a TX ACL
+			   packet gets received quite a long time after the connection close event.
+			   Some chips will send an ack for that when a connection is made that reuses
+			   the handle. If there is any outstanding packet, we block the TX for a short amount
+			   of time to ignore these acks (but presumably that packet is also sent to the other
+			   side of the connection, we can't do anything about that) */
+			c.connmgr.txNewConnBlockTime = time.Now().Add(1000 * time.Millisecond)
+		}
 
 		c.connmgr.logger.WithField("0handle", c.handle).Info("Connection lost")
 
@@ -144,6 +170,70 @@ func (c *Connection) disconnected() {
 			}
 		}()
 	})
+}
+
+func (c *ConnectionManager) encryptionChangeHandler(event *hcievents.EncryptionChangeEvent) *hcievents.EncryptionChangeEvent {
+	c.logger.WithFields(logrus.Fields{
+		"0handle":     event.ConnectionHandle,
+		"1status":     event.Status,
+		"2encryption": event.EncryptionEnabled,
+	}).Info("Encryption state changed")
+
+	c.Lock()
+	conn, ok := c.connections[event.ConnectionHandle]
+	cb := c.cb.EncryptionChanged
+	c.Unlock()
+
+	if !ok || cb == nil {
+		return event
+	}
+
+	return cb(conn, event)
+}
+
+func (c *ConnectionManager) encryptionKeyRefreshHandler(event *hcievents.EncryptionKeyRefreshCompleteEvent) *hcievents.EncryptionKeyRefreshCompleteEvent {
+	c.logger.WithFields(logrus.Fields{
+		"0handle": event.ConnectionHandle,
+		"1status": event.Status,
+	}).Info("Encryption key changed")
+
+	c.Lock()
+	conn, ok := c.connections[event.ConnectionHandle]
+	cb := c.cb.EncryptionRefresh
+	c.Unlock()
+
+	if !ok || cb == nil {
+		return event
+	}
+
+	return cb(conn, event)
+}
+
+func (c *ConnectionManager) encryptionLELongTermKeyRequestHandler(event *hcievents.LELongTermKeyRequestEvent) *hcievents.LELongTermKeyRequestEvent {
+	var key []byte
+	c.Lock()
+	conn, ok := c.connections[event.ConnectionHandle]
+	cb := c.cb.LEEncryptionGetKey
+	c.Unlock()
+
+	retVal := event
+	if ok && cb != nil {
+		key, retVal = cb(conn, retVal)
+	}
+
+	if len(key) == 16 {
+		in := hcicommands.LELongTermKeyRequestReplyInput{
+			ConnectionHandle: event.ConnectionHandle,
+		}
+		copy(in.LongTermKey[:], key)
+		go c.Cmds.LELongTermKeyRequestReplySync(in, nil)
+	} else {
+		go c.Cmds.LELongTermKeyRequestNegativeReplySync(hcicommands.LELongTermKeyRequestNegativeReplyInput{
+			ConnectionHandle: event.ConnectionHandle,
+		}, nil)
+	}
+
+	return retVal
 }
 
 func (c *ConnectionManager) ConnectionNew(handle uint16, closeFunc func() error) *Connection {
@@ -163,7 +253,29 @@ func (c *ConnectionManager) ConnectionNew(handle uint16, closeFunc func() error)
 		rxPDU:         bleutil.GetBuffer(64),
 		closeFunc:     closeFunc,
 	}
+
+	now := time.Now()
+	if now.Before(c.txNewConnBlockTime) {
+		conn.txLockout = true
+		go func(delay time.Duration) {
+			time.Sleep(delay)
+
+			c.logger.WithField("0handle", handle).Debug("Unlocking transmitter")
+
+			conn.txOutstandingMutex.Lock()
+			conn.txLockout = false
+			conn.txOutstandingMutex.Unlock()
+
+			/* Kick the transmitter */
+			select {
+			case conn.txSlotManager.newFragmentsChan <- struct{}{}:
+			default:
+			}
+		}(c.txNewConnBlockTime.Sub(now))
+	}
+
 	c.connections[handle] = conn
+
 	c.Unlock()
 
 	c.logger.WithField("0handle", handle).Debug("Created new connection")

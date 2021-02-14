@@ -210,9 +210,9 @@ func (s Structure) String() string {
 		for _, k := range m.characteristics {
 			ln(" %v (%02x):", k.uuid, k.flags)
 			if k.ValueHandle != nil {
-				ln("  ValueHandle: %d", k.ValueHandle.Info.Handle)
+				ln("  ValueHandle: %04x", k.ValueHandle.Info.Handle)
 				if k.ValueHandle.CCCHandle != nil {
-					ln("   CCCHandle: %d", k.ValueHandle.CCCHandle.Info.Handle)
+					ln("   CCCHandle: %04x", k.ValueHandle.CCCHandle.Info.Handle)
 				}
 			}
 		}

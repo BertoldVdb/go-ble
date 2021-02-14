@@ -3,6 +3,7 @@ package hciconnmgr
 import (
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/BertoldVdb/go-misc/closeflag"
 	"github.com/BertoldVdb/go-misc/multirun"
@@ -16,6 +17,12 @@ import (
 
 type ConnectionManagerConfig struct {
 	HookConnectionStateChange func(c *Connection, open bool)
+}
+
+type ConnectionMangerEventsSMP struct {
+	LEEncryptionGetKey func(conn *Connection, event *hcievents.LELongTermKeyRequestEvent) ([]byte, *hcievents.LELongTermKeyRequestEvent)
+	EncryptionChanged  func(conn *Connection, event *hcievents.EncryptionChangeEvent) *hcievents.EncryptionChangeEvent
+	EncryptionRefresh  func(conn *Connection, event *hcievents.EncryptionKeyRefreshCompleteEvent) *hcievents.EncryptionKeyRefreshCompleteEvent
 }
 
 type ConnectionManager struct {
@@ -38,9 +45,13 @@ type ConnectionManager struct {
 	txSlotManagerEDRSDO *txSlotManager //Not used for now
 	txSlotManagerLEACL  *txSlotManager
 
+	txNewConnBlockTime time.Time
+
 	useWg sync.WaitGroup
 
 	useBroadcomQuirk bool
+
+	cb ConnectionMangerEventsSMP
 }
 
 var (
@@ -66,6 +77,13 @@ func New(logger *logrus.Entry, cmds *hcicommands.Commands, events *hcievents.Eve
 	}
 }
 
+func (c *ConnectionManager) SetEventsSMP(cb ConnectionMangerEventsSMP) {
+	c.Lock()
+	defer c.Unlock()
+
+	c.cb = cb
+}
+
 func (c *ConnectionManager) disconnectionCompleteHandler(event *hcievents.DisconnectionCompleteEvent) *hcievents.DisconnectionCompleteEvent {
 	if event.Status != 0 {
 		return event
@@ -78,17 +96,6 @@ func (c *ConnectionManager) disconnectionCompleteHandler(event *hcievents.Discon
 		conn.disconnected()
 	}
 	c.Unlock()
-
-	return event
-}
-
-func (c *ConnectionManager) encryptionChangeHandler(event *hcievents.EncryptionChangeEvent) *hcievents.EncryptionChangeEvent {
-	logrus.Printf("Encryption change: %+v", event)
-	return event
-}
-
-func (c *ConnectionManager) encryptionKeyRefreshHandler(event *hcievents.EncryptionKeyRefreshCompleteEvent) *hcievents.EncryptionKeyRefreshCompleteEvent {
-	logrus.Printf("Encryption refresh: %+v", event)
 
 	return event
 }
@@ -129,6 +136,11 @@ func (c *ConnectionManager) Run(readyCb func()) error {
 	}
 
 	err = c.Events.SetEncryptionKeyRefreshCompleteEventCallback(c.encryptionKeyRefreshHandler)
+	if err != nil {
+		return err
+	}
+
+	err = c.Events.SetLELongTermKeyRequestEventCallback(c.encryptionLELongTermKeyRequestHandler)
 	if err != nil {
 		return err
 	}

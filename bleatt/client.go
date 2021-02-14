@@ -21,6 +21,8 @@ type attClientCmdData struct {
 }
 
 type attClient struct {
+	ctxExpired context.Context
+
 	parent *gattDeviceConn
 	cmdmgr *slotset.SlotSet
 
@@ -41,6 +43,11 @@ func (a *attClient) init(parent *gattDeviceConn) error {
 
 		timeoutTimer: time.NewTimer(0),
 	}
+
+	ctxExpired, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	a.ctxExpired = ctxExpired
 
 	<-a.timeoutTimer.C
 	go a.handleTimeout()
@@ -79,9 +86,9 @@ func (a *attClient) sendCommand(ctx context.Context, cmd *pdu.PDU, withReply boo
 func (a *attClient) sendCommandErrRsp(ctx context.Context, req *pdu.PDU) (ATTCommand, *pdu.PDU, ATTError, error) {
 	method := req.Buf()[0]
 	cmd, response, err := a.sendCommand(ctx, req, true)
-	if cmd == ATTErrorRsp {
+	if err == nil && cmd == ATTErrorRsp {
 		data := response.DropLeft(4)
-		defer bleutil.ReleaseBuffer(response)
+		bleutil.ReleaseBuffer(response)
 
 		if data == nil || data[0] != method {
 			return cmd, nil, 0, ErrorProtocolViolation
@@ -111,9 +118,7 @@ func (a *attClient) write(buf *pdu.PDU, expectReply bool) error {
 }
 
 func (a *attClient) handleNotify(handle uint16, data []byte) {
-	a.parent.parent.clientStructureMutex.Lock()
-	structure := a.parent.parent.clientStructure
-	a.parent.parent.clientStructureMutex.Unlock()
+	structure := a.parent.parent.ClientGetStructure(a.ctxExpired)
 
 	if structure != nil {
 		structure.InjectNotify(handle, data)
@@ -289,6 +294,8 @@ main:
 }
 
 func (a *attClient) writeHandle(ctx context.Context, handle uint16, value []byte, withRsp bool) (int, ATTError, error) {
+	first := true
+retry:
 	mtu := a.parent.getMTU()
 
 	if len(value) > mtu-3 {
@@ -305,6 +312,15 @@ func (a *attClient) writeHandle(ctx context.Context, handle uint16, value []byte
 		_, buf, atterr, err := a.sendCommandErrRsp(ctx, buf)
 		bleutil.ReleaseBuffer(buf)
 
+		if first && err == nil && (atterr == ATTErrorInsufficientEncryption || atterr == ATTErrorInsufficientAuthentication) {
+			_, err := a.parent.parent.smpConn.GoSecure(ctx, true)
+			if err != nil {
+				return len(value), atterr, err
+			}
+			first = false
+			goto retry
+		}
+
 		return len(value), atterr, err
 	}
 
@@ -314,42 +330,70 @@ func (a *attClient) writeHandle(ctx context.Context, handle uint16, value []byte
 }
 
 func (a *attClient) readHandle(ctx context.Context, handle uint16, result []byte) ([]byte, ATTError, error) {
+	first := true
+
+retry:
 	buf := bleutil.GetBuffer(3)
 	buf.Buf()[0] = byte(ATTReadReq)
 	binary.LittleEndian.PutUint16(buf.Buf()[1:], handle)
 
-	cmd, response, aterr, err := a.sendCommandErrRsp(ctx, buf)
-	defer bleutil.ReleaseBuffer(response)
+	cmd, response, atterr, err := a.sendCommandErrRsp(ctx, buf)
+	if response != nil {
+		result = append(result[:0], response.Buf()...)
+		bleutil.ReleaseBuffer(response)
+	}
 
-	if err != nil || aterr != 0 {
-		return nil, aterr, err
+	if first && err == nil && (atterr == ATTErrorInsufficientEncryption || atterr == ATTErrorInsufficientAuthentication) {
+		_, err := a.parent.parent.smpConn.GoSecure(ctx, true)
+		if err != nil {
+			return result, atterr, err
+		}
+		first = false
+		goto retry
+	}
+
+	if err != nil || atterr != 0 {
+		return nil, atterr, err
 	}
 
 	if cmd != ATTReadRsp {
 		return nil, 0, ErrorProtocolViolation
 	}
 
-	result = append(result[:0], response.Buf()...)
 	return result, 0, err
 }
 
 func (a *attClient) readHandleBlob(ctx context.Context, handle uint16, result []byte) ([]byte, ATTError, error) {
+	first := true
+
+retry:
 	buf := bleutil.GetBuffer(5)
 	buf.Buf()[0] = byte(ATTReadBlobReq)
 	binary.LittleEndian.PutUint16(buf.Buf()[1:], handle)
 	binary.LittleEndian.PutUint16(buf.Buf()[3:], uint16(len(result)))
 
-	cmd, response, aterr, err := a.sendCommandErrRsp(ctx, buf)
-	defer bleutil.ReleaseBuffer(response)
+	cmd, response, atterr, err := a.sendCommandErrRsp(ctx, buf)
+	if response != nil {
+		result = append(result, response.Buf()...)
+		bleutil.ReleaseBuffer(response)
+	}
 
-	if err != nil || aterr != 0 {
-		return nil, aterr, err
+	if first && err == nil && (atterr == ATTErrorInsufficientEncryption || atterr == ATTErrorInsufficientAuthentication) {
+		_, err := a.parent.parent.smpConn.GoSecure(ctx, true)
+		if err != nil {
+			return result, atterr, err
+		}
+		first = false
+		goto retry
+	}
+
+	if err != nil || atterr != 0 {
+		return nil, atterr, err
 	}
 
 	if cmd != ATTReadBlobRsp {
 		return result, 0, ErrorProtocolViolation
 	}
-	result = append(result, response.Buf()...)
 	return result, 0, err
 }
 

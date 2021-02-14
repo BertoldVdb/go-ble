@@ -1,6 +1,8 @@
 package blesmp
 
-import "context"
+import (
+	"context"
+)
 
 func (c *SMPConn) reader() {
 	ctx := context.Background()

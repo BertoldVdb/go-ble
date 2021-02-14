@@ -71,14 +71,22 @@ func (result *ExportedStructure) Append(s *Structure) {
 			c.ValueHandle = charValue
 			result.Handles = append(result.Handles, charValue)
 
+			var cccFlag CharacteristicFlag
+			if c.flags&CharacteristicReadNeedsEncryption > 0 {
+				cccFlag |= CharacteristicWriteNeedsEncryption
+			}
+			if c.flags&CharacteristicReadNeedsAuthentication > 0 {
+				cccFlag |= CharacteristicWriteNeedsAuthentication
+			}
+
 			/* Does it need a CCC? */
-			if c.flags&(CharacteristicIndicate|CharacteristicIndicate) > 0 {
+			if c.flags&(CharacteristicIndicate|CharacteristicNotify) > 0 {
 				result.idx++
 				charValue.CCCHandle = &GATTHandle{
 					Info: HandleInfo{Handle: result.idx,
 						UUIDWidth: UUIDCharacteristicClientConfiguration.GetLength(),
 						UUID:      UUIDCharacteristicClientConfiguration,
-						Flags:     CharacteristicRead | CharacteristicWriteAck,
+						Flags:     CharacteristicRead | CharacteristicWriteAck | cccFlag,
 					},
 					Value: []byte{0, 0},
 				}

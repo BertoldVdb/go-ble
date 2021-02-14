@@ -47,6 +47,7 @@ const (
 type ATTError uint8
 
 const (
+	ATTErrorNone                       ATTError = 0
 	ATTErrorInvalidHandle              ATTError = 0x01
 	ATTErrorReadNotPermitted           ATTError = 0x02
 	ATTErrorWriteNotPermitted          ATTError = 0x03

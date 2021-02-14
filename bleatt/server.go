@@ -146,8 +146,9 @@ func (a *attServer) handleDiscovery(conn *gattDeviceConn, method ATTCommand, buf
 			continue
 		}
 
-		if m.Info.Flags&attstructure.CharacteristicRead == 0 {
-			return false, sendError(conn, method, m.Info.Handle, ATTErrorReadNotPermitted)
+		secErr := a.checkSecurity(true, m.Info.Flags)
+		if secErr != ATTErrorNone {
+			return false, sendError(conn, method, m.Info.Handle, secErr)
 		}
 
 		if checkValue != nil && !bytes.Equal(m.Value, checkValue) {
@@ -241,6 +242,47 @@ func (a *attServer) findHandle(handle uint16) *attstructure.GATTHandle {
 	return nil
 }
 
+func (a *attServer) checkSecurity(isRead bool, flags attstructure.CharacteristicFlag) ATTError {
+	if isRead && flags&attstructure.CharacteristicRead == 0 {
+		return ATTErrorReadNotPermitted
+	}
+
+	if !isRead && (flags&(attstructure.CharacteristicWriteAck|attstructure.CharacteristicWriteNoAck) == 0) {
+		return ATTErrorWriteNotPermitted
+	}
+
+	needEncryption := false
+	if isRead && flags&attstructure.CharacteristicReadNeedsEncryption > 0 {
+		needEncryption = true
+	}
+	if !isRead && flags&attstructure.CharacteristicWriteNeedsEncryption > 0 {
+		needEncryption = true
+	}
+
+	needAuthentication := false
+	if isRead && flags&attstructure.CharacteristicReadNeedsAuthentication > 0 {
+		needAuthentication = true
+	}
+	if !isRead && flags&attstructure.CharacteristicWriteNeedsAuthentication > 0 {
+		needAuthentication = true
+	}
+
+	if needEncryption || needAuthentication {
+		if a.parent.smpConn == nil {
+			return ATTErrorUnlikelyError
+		}
+		encryption, authentication, _ := a.parent.smpConn.GetSecurity()
+		if needEncryption && !encryption {
+			return ATTErrorInsufficientEncryption
+		}
+		if needAuthentication && !authentication {
+			return ATTErrorInsufficientAuthentication
+		}
+	}
+
+	return ATTErrorNone
+}
+
 func (a *attServer) handleReadReq(conn *gattDeviceConn, method ATTCommand, buf *pdu.PDU) (bool, error) {
 	if (method == ATTReadReq && buf.Len() != 2) || (method == ATTReadBlobReq && buf.Len() != 4) {
 		return false, ErrorProtocolViolation
@@ -252,8 +294,9 @@ func (a *attServer) handleReadReq(conn *gattDeviceConn, method ATTCommand, buf *
 		return false, sendError(conn, method, idx, ATTErrorInvalidHandle)
 	}
 
-	if handle.Info.Flags&attstructure.CharacteristicRead == 0 {
-		return false, sendError(conn, method, idx, ATTErrorReadNotPermitted)
+	secErr := a.checkSecurity(true, handle.Info.Flags)
+	if secErr != ATTErrorNone {
+		return false, sendError(conn, method, idx, secErr)
 	}
 
 	offset := 0
@@ -305,8 +348,9 @@ func (a *attServer) handleReadReqMultiple(conn *gattDeviceConn, method ATTComman
 			return false, sendError(conn, method, idx, ATTErrorInvalidHandle)
 		}
 
-		if handle.Info.Flags&attstructure.CharacteristicRead == 0 {
-			return false, sendError(conn, method, idx, ATTErrorReadNotPermitted)
+		secErr := a.checkSecurity(true, handle.Info.Flags)
+		if secErr != ATTErrorNone {
+			return false, sendError(conn, method, idx, secErr)
 		}
 
 		if addLen {
@@ -337,8 +381,9 @@ func (a *attServer) handleWriteReq(conn *gattDeviceConn, method ATTCommand, buf 
 		return false, sendError(conn, method, idx, ATTErrorInvalidHandle)
 	}
 
-	if handle.Info.Flags&(attstructure.CharacteristicWriteAck|attstructure.CharacteristicWriteNoAck) == 0 {
-		return false, sendError(conn, method, idx, ATTErrorWriteNotPermitted)
+	secErr := a.checkSecurity(false, handle.Info.Flags)
+	if secErr != ATTErrorNone {
+		return false, sendError(conn, method, idx, secErr)
 	}
 
 	a.localStructure.Lock()
@@ -368,8 +413,9 @@ func (a *attServer) handlePrepateWriteReq(conn *gattDeviceConn, buf *pdu.PDU) (b
 		return false, sendError(conn, ATTPrepareWriteReq, idx, ATTErrorInvalidHandle)
 	}
 
-	if handle.Info.Flags&(attstructure.CharacteristicWriteAck|attstructure.CharacteristicWriteNoAck) == 0 {
-		return false, sendError(conn, ATTPrepareWriteReq, idx, ATTErrorWriteNotPermitted)
+	secErr := a.checkSecurity(false, handle.Info.Flags)
+	if secErr != ATTErrorNone {
+		return false, sendError(conn, ATTPrepareWriteReq, idx, secErr)
 	}
 
 	offset := binary.LittleEndian.Uint16(buf.Buf()[2:])

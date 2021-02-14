@@ -79,9 +79,14 @@ func (p *PeripheralHelper) handleConn(conn hciconnmgr.BufferConn, remoteAddr net
 			switch psm {
 			case blel2cap.PSMTypeATT:
 				dev.AddConn(accept())
+			case blel2cap.PSMTypeSecurityManager:
+				dev.SetSMP(p.stack.SMP.AddConn(accept(), nil))
 			}
 		})
-		go l2.Run()
+		go func() {
+			l2.Run()
+			cf.Close()
+		}()
 	}
 
 	<-cf.Chan()

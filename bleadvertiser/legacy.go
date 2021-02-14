@@ -68,11 +68,11 @@ func (a *BLEAdvertiser) legacyAdvertisingConfigure(data *LegacyAdvertisingData) 
 	/* There is no way to test if advertising is enabled (and some hardware disables it on its own),
 	   but this command cannot be run when it is, so we can know */
 	err := a.ctrl.Cmds.LESetAdvertisingParametersSync(advParams)
-
 	if err != nil {
 		err := a.ctrl.Cmds.LESetAdvertisingEnableSync(hcicommands.LESetAdvertisingEnableInput{
 			AdvertisingEnable: 0,
 		})
+
 		if err != nil || data == nil {
 			return err
 		}
