@@ -18,6 +18,9 @@ type BLEScannerConfig struct {
 	StoreGAPMap         bool
 	ScanCycleDurationMs int
 	ScanCycleActiveDuty float32
+
+	LEScanInterval uint16
+	LEScanWindow   uint16
 }
 
 type BLEScanner struct {
@@ -78,8 +81,8 @@ func (s *BLEScanner) configureScan(scanType int, durationMs int) error {
 	}
 
 	params := hcicommands.LESetScanParametersInput{
-		LEScanInterval:       16,
-		LEScanWindow:         16,
+		LEScanInterval:       s.config.LEScanInterval,
+		LEScanWindow:         s.config.LEScanWindow,
 		OwnAddressType:       s.ctrl.GetLERecommenedOwnAddrType(hci.LEAddrUsageScan),
 		ScanningFilterPolicy: 0,
 	}
@@ -112,6 +115,11 @@ func (s *BLEScanner) Run() error {
 	if s.config.ScanCycleDurationMs == 0 {
 		s.config.ScanCycleDurationMs = 10000
 		s.config.ScanCycleActiveDuty = 0.25
+	}
+
+	if s.config.LEScanInterval == 0 {
+		s.config.LEScanInterval = 64
+		s.config.LEScanWindow = 12
 	}
 
 	if s.config.ScanCycleActiveDuty <= 0 {

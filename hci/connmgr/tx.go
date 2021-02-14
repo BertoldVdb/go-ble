@@ -1,9 +1,9 @@
 package hciconnmgr
 
 import (
+	"log"
 	"math"
 	"sync"
-	"sync/atomic"
 
 	hcievents "github.com/BertoldVdb/go-ble/hci/events"
 	bleutil "github.com/BertoldVdb/go-ble/util"
@@ -106,6 +106,7 @@ func (s *txSlotManager) txWorker() error {
 		case <-s.newFragmentsChan:
 		}
 
+		log.Println("Starting send")
 	sendingLoop:
 		for {
 			var conn *Connection
@@ -118,8 +119,12 @@ func (s *txSlotManager) txWorker() error {
 				}
 
 				if m.txFIFO.Len() > 0 {
-					outstanding := atomic.LoadInt32(&m.txOutstanding)
-					if outstanding < minOutstanding {
+					m.txOutstandingMutex.Lock()
+					outstanding := m.txOutstanding
+					lockout := m.txLockout
+					m.txOutstandingMutex.Unlock()
+
+					if !lockout && outstanding < minOutstanding {
 						conn = m
 						minOutstanding = outstanding
 					}
@@ -146,7 +151,13 @@ func (s *txSlotManager) txWorker() error {
 					"1handle":  conn.handle,
 				}).Debug("Requested a slot but was not able to use it")
 			} else {
-				newOutstanding := atomic.AddInt32(&conn.txOutstanding, 1)
+				var newOutstanding int32
+				conn.txOutstandingMutex.Lock()
+				if !conn.txOutstandingFlush {
+					conn.txOutstanding++
+					newOutstanding = conn.txOutstanding
+				}
+				conn.txOutstandingMutex.Unlock()
 
 				if s.connmgr.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
 					s.connmgr.logger.WithFields(logrus.Fields{
@@ -157,12 +168,19 @@ func (s *txSlotManager) txWorker() error {
 					}).Trace("Sending fragment")
 				}
 
-				/* Send the packet */
-				err := s.connmgr.sendFunc(buf.Buf())
-				bleutil.ReleaseBuffer(buf)
+				if newOutstanding > 0 {
+					/* Send the packet */
+					log.Printf("sending %v %p", newOutstanding, conn)
+					err := s.connmgr.sendFunc(buf.Buf())
 
-				if err != nil {
-					return err
+					bleutil.ReleaseBuffer(buf)
+
+					if err != nil {
+						return err
+					}
+				} else {
+					/* Connection is not transmitting, so we just give the slot back */
+					s.ReleaseSlots(1)
 				}
 			}
 		}
@@ -193,20 +211,34 @@ func (c *ConnectionManager) packetCompleteHandler(event *hcievents.NumberOfCompl
 	}
 
 	c.RLock()
+
 	for i := range event.ConnectionHandle {
 		conn, ok := c.connections[event.ConnectionHandle[i]]
 		if ok {
-			conn.txSlotManager.ReleaseSlots(int(event.NumCompletedPackets[i]))
+			del := int32(event.NumCompletedPackets[i])
 
-			outstanding := atomic.AddInt32(&conn.txOutstanding, -int32(event.NumCompletedPackets[i]))
-			bleutil.Assert(outstanding >= 0, "Negative number of outstanding packets")
+			conn.txOutstandingMutex.Lock()
 
-			if c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
-				c.logger.WithFields(logrus.Fields{
-					"0handle":      conn.handle,
-					"1completed":   event.NumCompletedPackets[i],
-					"2outstanding": outstanding,
-				}).Trace("Buffer status update received")
+			if conn.txLockout || conn.txOutstandingFlush {
+				del = 0
+			} else {
+				log.Println("Complete", conn.txOutstanding, del)
+				conn.txOutstanding -= del
+				//TODO: make non-fatal
+				bleutil.Assert(conn.txOutstanding >= 0, "Negative outstanding packets")
+			}
+
+			conn.txOutstandingMutex.Unlock()
+
+			if del > 0 {
+				conn.txSlotManager.ReleaseSlots(int(del))
+
+				if c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+					c.logger.WithFields(logrus.Fields{
+						"0handle":    conn.handle,
+						"1completed": event.NumCompletedPackets[i],
+					}).Trace("Buffer status update received")
+				}
 			}
 		}
 

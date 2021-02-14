@@ -54,7 +54,7 @@ type ControllerConfig struct {
 func DefaultConfig() *ControllerConfig {
 	return &ControllerConfig{
 		AwaitStartup:     false,
-		LERandomAddrBits: 24,
+		LERandomAddrBits: 48,
 
 		PrivacyConnect:   true,
 		PrivacyScan:      true,

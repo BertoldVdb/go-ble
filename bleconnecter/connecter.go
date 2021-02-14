@@ -174,8 +174,8 @@ func (c *BLEConnecter) Run() error {
 	c.ctrl.Events.SetLEConnectionUpdateCompleteEventCallback(c.leConnectionUpdateCompleteHandler)
 
 	/* Activate the connect calls */
-	for _, m := range c.roles {
-		m.singleChan <- struct{}{}
+	for i := range c.roles {
+		c.roles[i].singleChan <- struct{}{}
 	}
 
 	<-c.closeflag.Chan()
@@ -369,4 +369,8 @@ func (c *BLEConnecter) Connect(ctx context.Context, isCentral bool, peerAddrs []
 	}
 
 	return conn, peerAddrs, nil
+}
+
+func (c *BLEConnection) IsCentral() bool {
+	return c.isCentral
 }

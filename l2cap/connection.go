@@ -149,11 +149,11 @@ func (l *L2CAP) Dial() *L2Connection {
 
 func (l *L2CAP) connectionDefaultInit() {
 	if l.isLE {
-		l.newConnCb(PSMTypeATT, func() hciconnmgr.BufferConn {
-			return l.connectionCreateInternal(false, 4, 4) /* ATT */
-		})
 		l.newConnCb(PSMTypeSecurityManager, func() hciconnmgr.BufferConn {
 			return l.connectionCreateInternal(false, 6, 6) /* SMP */
+		})
+		l.newConnCb(PSMTypeATT, func() hciconnmgr.BufferConn {
+			return l.connectionCreateInternal(false, 4, 4) /* ATT */
 		})
 	}
 }

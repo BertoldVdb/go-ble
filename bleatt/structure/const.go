@@ -31,4 +31,12 @@ const (
 	CharacteristicIndicate    CharacteristicFlag = 0x20
 	CharacteristicSignedWrite CharacteristicFlag = 0x40
 	CharacteristicExtended    CharacteristicFlag = 0x80
+
+	CharacteristicNeedsEncryptionAuthentication CharacteristicFlag = CharacteristicNeedsEncryption | CharacteristicNeedsAuthentication
+	CharacteristicNeedsEncryption               CharacteristicFlag = CharacteristicReadNeedsEncryption | CharacteristicWriteNeedsEncryption
+	CharacteristicReadNeedsEncryption           CharacteristicFlag = 0x100
+	CharacteristicWriteNeedsEncryption          CharacteristicFlag = 0x200
+	CharacteristicNeedsAuthentication           CharacteristicFlag = CharacteristicReadNeedsAuthentication | CharacteristicWriteNeedsAuthentication
+	CharacteristicReadNeedsAuthentication       CharacteristicFlag = 0x400
+	CharacteristicWriteNeedsAuthentication      CharacteristicFlag = 0x800
 )

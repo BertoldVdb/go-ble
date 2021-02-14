@@ -9,8 +9,10 @@ import (
 	"sync/atomic"
 
 	attstructure "github.com/BertoldVdb/go-ble/bleatt/structure"
+	"github.com/BertoldVdb/go-ble/blesmp"
 	hciconnmgr "github.com/BertoldVdb/go-ble/hci/connmgr"
 	bleutil "github.com/BertoldVdb/go-ble/util"
+	"github.com/BertoldVdb/go-misc/once"
 	pdu "github.com/BertoldVdb/go-misc/pdubuf"
 	"github.com/sirupsen/logrus"
 )
@@ -18,19 +20,19 @@ import (
 type GattDevice struct {
 	config *GattDeviceConfig
 
-	connsMutex  sync.Mutex
-	conns       map[hciconnmgr.BufferConn](*gattDeviceConn)
-	initialConn *gattDeviceConn
+	connsMutex       sync.Mutex
+	conns            map[hciconnmgr.BufferConn](*gattDeviceConn)
+	initialConn      *gattDeviceConn
+	initialConnValid chan (struct{})
 
 	ourMTU uint16
 
 	server attServer
 
-	//You only need to use either the done channel or the mutex
-	clientStructureMutex        sync.Mutex
-	clientStructureDiscoverOnce sync.Once
-	clientDiscoveryDone         chan (struct{})
-	clientStructure             *attstructure.Structure
+	clientDiscoveryOnce once.Once
+	clientStructure     *attstructure.Structure
+
+	smpConn *blesmp.SMPConn
 }
 
 type gattDeviceConn struct {
@@ -67,10 +69,15 @@ func NewGattDevice(externalStructure *attstructure.Structure, config *GattDevice
 	}
 
 	dev := &GattDevice{
-		conns:               make(map[hciconnmgr.BufferConn](*gattDeviceConn)),
-		ourMTU:              0xFFFF,
-		config:              config,
-		clientDiscoveryDone: make(chan (struct{})),
+		conns:            make(map[hciconnmgr.BufferConn](*gattDeviceConn)),
+		ourMTU:           0xFFFF,
+		config:           config,
+		initialConnValid: make(chan (struct{})),
+	}
+
+	dev.clientDiscoveryOnce.Handler = func() {
+		<-dev.initialConnValid
+		dev.clientDiscover(dev.initialConn)
 	}
 
 	gattStructure := attstructure.NewStructure()
@@ -89,6 +96,16 @@ func NewGattDevice(externalStructure *attstructure.Structure, config *GattDevice
 	dev.server.init(dev, exportedStructure)
 
 	return dev
+}
+
+func (d *GattDevice) SetSMP(smp *blesmp.SMPConn) {
+	d.connsMutex.Lock()
+	defer d.connsMutex.Unlock()
+
+	if len(d.conns) != 0 {
+		panic("SetSMP called after connections were added")
+	}
+	d.smpConn = smp
 }
 
 func (d *gattDeviceConn) handlePDU(buf *pdu.PDU) (bool, error) {
@@ -177,13 +194,13 @@ func (g *GattDevice) AddConn(conn hciconnmgr.BufferConn) error {
 	}
 
 	conn.UseStart()
-
 	d.client.init(d)
 
 	g.connsMutex.Lock()
 	initial := false
 	if g.initialConn == nil { //This is the connection that is always present
 		g.initialConn = d
+		close(g.initialConnValid)
 		initial = true
 	}
 	g.conns[conn] = d
@@ -195,7 +212,7 @@ func (g *GattDevice) AddConn(conn hciconnmgr.BufferConn) error {
 	go d.handleConn()
 	go d.getMTUBlocking()
 	if initial && d.parent.config.DiscoverRemoteOnConnect {
-		go g.clientDiscover(d)
+		go g.clientDiscoveryOnce.Trigger()
 	}
 
 	return nil
@@ -265,23 +282,25 @@ func (d *GattDevice) clientDiscover(conn *gattDeviceConn) {
 		}
 	}
 
-	d.clientStructureMutex.Lock()
-	defer d.clientStructureMutex.Unlock()
 	d.clientStructure = s
-	close(d.clientDiscoveryDone)
 }
 
 func (d *GattDevice) ClientGetStructure(ctx context.Context) *attstructure.Structure {
-	select {
-	case <-d.clientDiscoveryDone:
-		return d.clientStructure
-	case <-ctx.Done():
+	err := d.clientDiscoveryOnce.Wait(ctx)
+	if err != nil {
 		return nil
 	}
+
+	return d.clientStructure
 }
 
 func (d *GattDevice) ClientRead(ctx context.Context, handle uint16, buf []byte) ([]byte, error) {
 	//TODO: Allow using another connection for client requests
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-d.initialConnValid:
+	}
 	conn := d.initialConn
 
 	result, atterr, err := conn.client.readHandleAll(ctx, handle, buf)
@@ -293,6 +312,11 @@ func (d *GattDevice) ClientRead(ctx context.Context, handle uint16, buf []byte) 
 }
 
 func (d *GattDevice) ClientWrite(ctx context.Context, handle uint16, buf []byte, withRsp bool) (int, error) {
+	select {
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	case <-d.initialConnValid:
+	}
 	conn := d.initialConn
 
 	l, atterr, err := conn.client.writeHandle(ctx, handle, buf, withRsp)

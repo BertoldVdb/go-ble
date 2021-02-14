@@ -4,6 +4,7 @@ import (
 	"github.com/BertoldVdb/go-ble/bleadvertiser"
 	"github.com/BertoldVdb/go-ble/bleconnecter"
 	"github.com/BertoldVdb/go-ble/blescanner"
+	"github.com/BertoldVdb/go-ble/blesmp"
 	"github.com/BertoldVdb/go-misc/multirun"
 
 	hci "github.com/BertoldVdb/go-ble/hci"
@@ -19,6 +20,8 @@ type BluetoothStackConfig struct {
 	BLEConnecterConfig  *bleconnecter.BLEConnecterConfig
 	BLEAdvertiserUse    bool
 	BLEAdvertiserConfig *bleadvertiser.BLEAdvertiserConfig
+
+	SMPConfig           *blesmp.SMPConfig
 	HCIControllerConfig *hci.ControllerConfig
 }
 
@@ -30,6 +33,7 @@ func DefaultConfig() *BluetoothStackConfig {
 		BLEConnecterConfig:  &bleconnecter.BLEConnecterConfig{},
 		BLEAdvertiserUse:    true,
 		BLEAdvertiserConfig: bleadvertiser.DefaultConfig(),
+		SMPConfig:           blesmp.DefaultConfig(),
 		HCIControllerConfig: hci.DefaultConfig(),
 	}
 }
@@ -43,6 +47,7 @@ type BluetoothStack struct {
 	BLEScanner    *blescanner.BLEScanner
 	BLEAdvertiser *bleadvertiser.BLEAdvertiser
 	BLEConnecter  *bleconnecter.BLEConnecter
+	SMP           *blesmp.SMP
 }
 
 func New(logger *logrus.Entry, config *BluetoothStackConfig, dev hciinterface.HCIInterface) *BluetoothStack {
@@ -59,6 +64,10 @@ func New(logger *logrus.Entry, config *BluetoothStackConfig, dev hciinterface.HC
 	s.BLEScanner = blescanner.New(bleutil.LogWithPrefix(logger, "scanner"), s.Controller, config.BLEScannerConfig)
 	s.BLEAdvertiser = bleadvertiser.New(bleutil.LogWithPrefix(logger, "advertiser"), s.Controller, config.BLEAdvertiserConfig)
 	s.BLEConnecter = bleconnecter.New(bleutil.LogWithPrefix(logger, "connecter"), s.Controller, s.BLEAdvertiser, config.BLEConnecterConfig)
+
+	if s.Controller.ConnMgr != nil {
+		s.SMP = blesmp.New(bleutil.LogWithPrefix(logger, "smp"), s.Controller, config.SMPConfig)
+	}
 
 	s.multirun.RegisterRunnableReady(s.Controller)
 	if config.BLEScannerUse {
