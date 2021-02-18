@@ -1,7 +1,6 @@
 package hciconnmgr
 
 import (
-	"log"
 	"math"
 	"sync"
 
@@ -106,7 +105,6 @@ func (s *txSlotManager) txWorker() error {
 		case <-s.newFragmentsChan:
 		}
 
-		log.Println("Starting send")
 	sendingLoop:
 		for {
 			var conn *Connection
@@ -170,7 +168,6 @@ func (s *txSlotManager) txWorker() error {
 
 				if newOutstanding > 0 {
 					/* Send the packet */
-					log.Printf("sending %v %p", newOutstanding, conn)
 					err := s.connmgr.sendFunc(buf.Buf())
 
 					bleutil.ReleaseBuffer(buf)
@@ -222,7 +219,6 @@ func (c *ConnectionManager) packetCompleteHandler(event *hcievents.NumberOfCompl
 			if conn.txLockout || conn.txOutstandingFlush {
 				del = 0
 			} else {
-				log.Println("Complete", conn.txOutstanding, del)
 				conn.txOutstanding -= del
 				//TODO: make non-fatal
 				bleutil.Assert(conn.txOutstanding >= 0, "Negative outstanding packets")

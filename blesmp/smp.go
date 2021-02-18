@@ -3,7 +3,6 @@ package blesmp
 import (
 	"context"
 	"encoding/hex"
-	"log"
 	"os"
 	"path"
 	"sync"
@@ -319,7 +318,6 @@ func (c *SMPConn) GoSecure(ctx context.Context, allowStart bool) (SMPState, erro
 			return true
 		}
 
-		log.Println("Starting secure")
 		select {
 		case c.secureChan <- struct{}{}:
 		default:
