@@ -138,7 +138,7 @@ type SMPConn struct {
 
 	protocol smpProtocol
 
-	timeout *time.Timer
+	timeout <-chan (time.Time)
 
 	addrLERemote bleutil.BLEAddr
 	addrLELocal  bleutil.BLEAddr
@@ -159,9 +159,9 @@ type SMPConn struct {
 
 func (c *SMPConn) updateTimeout(run bool) {
 	if !run {
-		c.timeout.Stop()
+		c.timeout = nil
 	} else {
-		c.timeout.Reset(30 * time.Second)
+		c.timeout = time.After(30 * time.Second)
 	}
 }
 
@@ -187,7 +187,7 @@ func (c *SMPConn) smpHandler() {
 
 	for {
 		select {
-		case <-c.timeout.C:
+		case <-c.timeout:
 			c.logger.Warn("Security manager timeout")
 			c.setState(StatePermanentlyFailed)
 
@@ -242,15 +242,12 @@ func (p *SMP) AddConn(conn hciconnmgr.BufferConn, config *SMPConnConfig) *SMPCon
 		conn:          conn,
 		logger:        bleutil.LogWithPrefix(conn.GetLogger(), "smp"),
 		pduRx:         make(chan (*pdu.PDU), 1),
-		timeout:       time.NewTimer(0),
 		secureState:   StateInsecure,
 		secureChan:    make(chan (struct{}), 1),
 		encUpdateChan: make(chan (bool), 1),
 	}
 
 	c.secureAuthReq = config.AuthReq
-
-	<-c.timeout.C
 
 	raw := c.rawConnLE()
 	c.addrLERemote = raw.RemoteAddr().(bleutil.BLEAddr)

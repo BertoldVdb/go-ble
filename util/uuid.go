@@ -115,3 +115,13 @@ func (base UUID) CreateVariant(key uint8) UUID {
 
 	return base
 }
+
+func (base UUID) CreateVariantAlt(key uint8) UUID {
+	if base.GetLength() != 16 {
+		panic("Variant creation is only possible for random UUID")
+	}
+
+	base[12] += key
+
+	return base
+}

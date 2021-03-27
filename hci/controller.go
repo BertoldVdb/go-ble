@@ -3,6 +3,7 @@ package hci
 import (
 	"encoding/hex"
 	"sync"
+	"time"
 
 	hcicmdmgr "github.com/BertoldVdb/go-ble/hci/cmdmgr"
 	hcicommands "github.com/BertoldVdb/go-ble/hci/commands"
@@ -49,6 +50,8 @@ type ControllerConfig struct {
 
 	ConnectionManagerUsed   bool
 	ConnectionManagerConfig *hciconnmgr.ConnectionManagerConfig
+
+	WatchdogTimeout time.Duration
 }
 
 func DefaultConfig() *ControllerConfig {
@@ -62,6 +65,8 @@ func DefaultConfig() *ControllerConfig {
 
 		ConnectionManagerUsed:   true,
 		ConnectionManagerConfig: hciconnmgr.DefaultConfig(),
+
+		WatchdogTimeout: 30 * time.Second,
 	}
 }
 
@@ -127,6 +132,19 @@ func New(logger *logrus.Entry, dev hciinterface.HCIInterface, config *Controller
 	}, func() error {
 		return c.Cmds.BasebandResetSync()
 	})
+
+	if config.WatchdogTimeout > 0 {
+		c.multirun.RegisterFunc(func() error {
+			go func() {
+				var out hcicommands.InformationalReadBDADDROutput
+				for {
+					time.Sleep(30 * time.Second)
+					c.Cmds.InformationalReadBDADDRSync(&out)
+				}
+			}()
+			return nil
+		}, nil)
+	}
 
 	if c.ConnMgr != nil {
 		c.multirun.RegisterRunnableReady(c.ConnMgr)

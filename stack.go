@@ -20,6 +20,7 @@ type BluetoothStackConfig struct {
 	BLEConnecterConfig  *bleconnecter.BLEConnecterConfig
 	BLEAdvertiserUse    bool
 	BLEAdvertiserConfig *bleadvertiser.BLEAdvertiserConfig
+	BLEWatchdogUse      bool
 
 	SMPConfig           *blesmp.SMPConfig
 	HCIControllerConfig *hci.ControllerConfig

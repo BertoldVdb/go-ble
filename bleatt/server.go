@@ -597,6 +597,12 @@ func (a *attServer) characteristicNotify(ctx context.Context, characteristic *at
 
 	_, bytes := a.addPayload(conn, buf, value)
 
+	if conn.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		conn.logger.WithFields(logrus.Fields{
+			"0buf": buf,
+		}).Debug("ATT Notify")
+	}
+
 	_, resp, err := conn.client.sendCommand(ctx, buf, cmd == ATTHandleValueIND)
 	bleutil.ReleaseBuffer(resp)
 	return bytes, err

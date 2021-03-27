@@ -41,16 +41,17 @@ func (a *attClient) init(parent *gattDeviceConn) error {
 			slot.Data = &attClientCmdData{}
 		}),
 
-		timeoutTimer: time.NewTimer(0),
+		timeoutTimer: time.AfterFunc(time.Hour, func() {
+			parent.parent.CloseConn(parent.conn)
+		}),
 	}
+
+	a.timeoutTimer.Stop()
 
 	ctxExpired, cancel := context.WithCancel(context.Background())
 	cancel()
 
 	a.ctxExpired = ctxExpired
-
-	<-a.timeoutTimer.C
-	go a.handleTimeout()
 
 	return nil
 }
@@ -181,17 +182,11 @@ func (a *attClient) handleNTFIND(method ATTCommand, buf *pdu.PDU) (bool, error) 
 	return false, nil
 }
 
-func (a *attClient) handleTimeout() {
-	defer a.parent.parent.CloseConn(a.parent.conn)
-
+func (a *attClient) close() {
 	a.timeoutTimerMutex.Lock()
-	t := a.timeoutTimer
+	a.timeoutTimer.Reset(0)
 	a.timeoutTimerMutex.Unlock()
 
-	<-t.C
-}
-
-func (a *attClient) close() {
 	a.cmdmgr.Close()
 }
 

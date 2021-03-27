@@ -89,7 +89,10 @@ func (p *PeripheralHelper) handleConn(conn hciconnmgr.BufferConn, remoteAddr net
 		}()
 	}
 
-	<-cf.Chan()
+	select {
+	case <-cf.Chan():
+	case <-p.ctx.Done():
+	}
 
 	for _, m := range impl {
 		m.Disconnected()
@@ -102,13 +105,15 @@ type PeripheralHelperConfig struct {
 	MACFilter        []bleutil.BLEAddr
 	ConnectionParams bleconnecter.BLEConnectionParametersRequested
 
-	DeviceName string
-	Appearance uint16
+	AcceptMultipleConnections bool
+	DeviceName                string
+	Appearance                uint16
 }
 
 func DefaultConfig() PeripheralHelperConfig {
 	return PeripheralHelperConfig{
-		DeviceName: "Unset",
+		DeviceName:                "Unset",
+		AcceptMultipleConnections: false,
 	}
 }
 
@@ -134,7 +139,15 @@ func (p *PeripheralHelper) Run() error {
 			return err
 		}
 
-		go p.handleConn(conn, conn.RemoteAddr())
+		f := func() {
+			p.handleConn(conn, conn.RemoteAddr())
+		}
+
+		if p.config.AcceptMultipleConnections {
+			go f()
+		} else {
+			f()
+		}
 	}
 }
 
