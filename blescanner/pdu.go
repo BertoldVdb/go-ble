@@ -8,6 +8,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type BLEAdvertisingReport struct {
+	Addr    bleutil.BLEAddr
+	RSSI    int8
+	PktType EventType
+	Data    []byte
+}
+
 func (dev *BLEDevice) handlePDU(event EventType, data []byte) {
 	for {
 		if len(data) < 2 {
@@ -51,15 +58,30 @@ func (s *BLEScanner) handleScanResult(ad *hcievents.LEAdvertisingReportEvent) *h
 	now := time.Now()
 
 	for i := 0; i < int(ad.NumReports); i++ {
-		dev, isNew := s.getDevice(bleutil.BLEAddr{
+		bleaddr := bleutil.BLEAddr{
 			MacAddr:     ad.Address[i],
 			MacAddrType: ad.AddressType[i],
-		}, true)
-		if dev == nil {
-			continue
 		}
 
 		event := EventType(ad.EventType[i])
+
+		pkt := BLEAdvertisingReport{
+			Addr:    bleaddr,
+			RSSI:    int8(ad.RSSI[i]),
+			PktType: event,
+			Data:    ad.Data[i],
+		}
+
+		s.Lock()
+		for _, m := range s.advertisingReportCallbacks {
+			m(&pkt)
+		}
+		s.Unlock()
+
+		dev, isNew := s.getDevice(bleaddr, true)
+		if dev == nil {
+			continue
+		}
 
 		dev.Lock()
 		dev.lastSeenDev = now
