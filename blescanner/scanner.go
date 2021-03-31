@@ -13,6 +13,7 @@ import (
 
 type GAPCallback func(*BLEDevice, *GAPRecord)
 type DeviceUpdatedCallback func(*BLEDevice)
+type AdvertisingReportCallback func(*BLEAdvertisingReport)
 
 type BLEScannerConfig struct {
 	StoreGAPMap         bool
@@ -33,6 +34,7 @@ type BLEScanner struct {
 	devices                      map[uint64]*BLEDevice
 	manufacturerSpecificCallback map[uint16]GAPCallback
 	deviceUpdatedCallbacks       []DeviceUpdatedCallback
+	advertisingReportCallbacks   []AdvertisingReportCallback
 	scanType                     int
 
 	nextCleanup time.Time
@@ -171,6 +173,13 @@ func (s *BLEScanner) RegisterDeviceUpdateCallback(cb DeviceUpdatedCallback) {
 	defer s.Unlock()
 
 	s.deviceUpdatedCallbacks = append(s.deviceUpdatedCallbacks, cb)
+}
+
+func (s *BLEScanner) RegisterAdvertisingReportCallback(cb AdvertisingReportCallback) {
+	s.Lock()
+	defer s.Unlock()
+
+	s.advertisingReportCallbacks = append(s.advertisingReportCallbacks, cb)
 }
 
 func (s *BLEScanner) SetManufacturerSpecificCallback(id uint16, cb GAPCallback) {
