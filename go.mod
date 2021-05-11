@@ -5,7 +5,6 @@ go 1.14
 require (
 	github.com/BertoldVdb/go-misc v0.1.5
 	github.com/BertoldVdb/logrus-prefixed-formatter v0.5.4 // indirect
-	github.com/byteflies/hw-go-tunnel v0.0.0-20200812094512-5c85d4008eb2 // indirect
 	github.com/gobuffalo/packr/v2 v2.8.1 // indirect
 	github.com/google/uuid v1.1.1
 	github.com/gorilla/websocket v1.4.2
