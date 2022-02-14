@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
