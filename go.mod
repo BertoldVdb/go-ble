@@ -8,7 +8,7 @@ require (
 	github.com/gobuffalo/packr/v2 v2.8.1 // indirect
 	github.com/google/uuid v1.1.1
 	github.com/gorilla/websocket v1.4.2
-	github.com/sirupsen/logrus v1.7.0
+	github.com/sirupsen/logrus v1.8.1
 	github.com/sqs/goreturns v0.0.0-20181028201513-538ac6014518 // indirect
 	golang.org/x/sys v0.0.0-20201202213521-69691e467435
 )
