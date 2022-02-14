@@ -146,11 +146,6 @@ func (a *attServer) handleDiscovery(conn *gattDeviceConn, method ATTCommand, buf
 			continue
 		}
 
-		secErr := a.checkSecurity(true, m.Info.Flags)
-		if secErr != ATTErrorNone {
-			return false, sendError(conn, method, m.Info.Handle, secErr)
-		}
-
 		if checkValue != nil && !bytes.Equal(m.Value, checkValue) {
 			continue
 		}
@@ -178,6 +173,13 @@ func (a *attServer) handleDiscovery(conn *gattDeviceConn, method ATTCommand, buf
 		case ATTFindByTypeValueReq:
 			needHeader = 0
 			extra = 2 + 2
+		}
+
+		if addValue {
+			secErr := a.checkSecurity(true, m.Info.Flags)
+			if secErr != ATTErrorNone {
+				return false, sendError(conn, method, m.Info.Handle, secErr)
+			}
 		}
 
 		if !hasResults {
@@ -617,3 +619,4 @@ func (a *attServer) write(conn *gattDeviceConn, buf *pdu.PDU) error {
 
 	return conn.conn.WriteBuffer(buf)
 }
+

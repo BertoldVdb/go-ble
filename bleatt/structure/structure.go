@@ -178,7 +178,7 @@ func (c *Characteristic) Subscribe(ctx context.Context, handler ClientNotifyHand
 		return errors.New("This characteristic does not support subscribing")
 	}
 
-	new := []byte{0}
+	new := []byte{0, 0}
 	handle := c.ValueHandle.Info.Handle
 
 	c.parent.parent.clientNotifyMutex.Lock()

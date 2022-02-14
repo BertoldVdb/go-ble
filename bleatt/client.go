@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -219,17 +220,31 @@ func (a *attClient) handlePDU(method ATTCommand, isAuthenticated bool, buf *pdu.
 }
 
 func (a *attClient) findInformation(ctx context.Context, startingHandle uint16, endingHandle uint16) ([]attstructure.HandleInfo, error) {
+	first := true
+retry:
+
 	buf := bleutil.GetBuffer(5)
 	buf.Buf()[0] = byte(ATTFindInformationReq)
 	binary.LittleEndian.PutUint16(buf.Buf()[1:], startingHandle)
 	binary.LittleEndian.PutUint16(buf.Buf()[3:], endingHandle)
 
-	cmd, response, err := a.sendCommand(ctx, buf, true)
-	defer bleutil.ReleaseBuffer(response)
+	_, response, atterr, err := a.sendCommandErrRsp(ctx, buf)
 
-	if err != nil || cmd != ATTFindInformationRsp {
+	if first && err == nil && (atterr == ATTErrorInsufficientEncryption || atterr == ATTErrorInsufficientAuthentication) {
+		_, err := a.parent.parent.smpConn.GoSecure(ctx, true)
+		if err != nil {
+			return nil, err
+		}
+		first = false
+
+		goto retry
+	}
+
+	if err != nil || response == nil {
 		return nil, err
 	}
+
+	defer bleutil.ReleaseBuffer(response)
 
 	header := response.DropLeft(1)
 	if header == nil {
@@ -485,3 +500,4 @@ func (a *attClient) discoverRemoteDeviceStructure() (*attstructure.Structure, er
 
 	return attstructure.ImportStructure(gattHandles, a.parent.parent.ClientRead, a.parent.parent.ClientWrite)
 }
+

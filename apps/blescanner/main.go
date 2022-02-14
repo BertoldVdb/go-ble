@@ -35,7 +35,12 @@ func main() {
 	m := multirun.MultiRun{}
 	m.HandleSIGTERM()
 
-	stack := ble.New(logger, nil, dev)
+	config := ble.DefaultConfig()
+	config.BLEScannerUse = true
+	config.BLEScannerConfig.LEScanInterval = 64
+	config.BLEScannerConfig.LEScanWindow = 64
+
+	stack := ble.New(logger, config, dev)
 	if stack == nil {
 		logger.Fatalln("Could not make stack")
 	}
