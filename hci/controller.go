@@ -12,7 +12,6 @@ import (
 	hcievents "github.com/BertoldVdb/go-ble/hci/events"
 	deviceinfo "github.com/BertoldVdb/go-ble/hci/information"
 	bleutil "github.com/BertoldVdb/go-ble/util"
-	"github.com/BertoldVdb/go-misc/closeflag"
 	"github.com/BertoldVdb/go-misc/multirun"
 
 	"github.com/sirupsen/logrus"
@@ -25,7 +24,6 @@ type Controller struct {
 	logger   *logrus.Entry
 	devMutex sync.Mutex
 	dev      hciinterface.HCIInterface
-	close    closeflag.CloseFlag
 	config   *ControllerConfig
 
 	Hcicmdmgr *hcicmdmgr.CommandManager
@@ -98,7 +96,7 @@ func New(logger *logrus.Entry, dev hciinterface.HCIInterface, config *Controller
 	}
 
 	c.dev.SetRecvHandler(func(rxPkt hciinterface.HCIRxPacket) error {
-		if rxPkt.Received == false {
+		if !rxPkt.Received {
 			return nil
 		}
 
@@ -134,19 +132,7 @@ func New(logger *logrus.Entry, dev hciinterface.HCIInterface, config *Controller
 	})
 
 	if config.WatchdogTimeout > 0 {
-		c.multirun.RegisterFunc(func() error {
-			go func() {
-				var out hcicommands.InformationalReadBDADDROutput
-				for {
-					time.Sleep(30 * time.Second)
-					_, err := c.Cmds.InformationalReadBDADDRSync(&out)
-					if err != nil {
-						return
-					}
-				}
-			}()
-			return nil
-		}, nil)
+		c.multirun.RegisterRunnableReady(&hciKeepAlive{ctrl: c})
 	}
 
 	if c.ConnMgr != nil {
