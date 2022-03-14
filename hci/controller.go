@@ -139,7 +139,10 @@ func New(logger *logrus.Entry, dev hciinterface.HCIInterface, config *Controller
 				var out hcicommands.InformationalReadBDADDROutput
 				for {
 					time.Sleep(30 * time.Second)
-					c.Cmds.InformationalReadBDADDRSync(&out)
+					_, err := c.Cmds.InformationalReadBDADDRSync(&out)
+					if err != nil {
+						return
+					}
 				}
 			}()
 			return nil
