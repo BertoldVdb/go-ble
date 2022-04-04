@@ -13,7 +13,7 @@ import (
 
 type GAPCallback func(*BLEDevice, *GAPRecord)
 type DeviceUpdatedCallback func(*BLEDevice)
-type AdvertisingReportCallback func(*BLEAdvertisingReport)
+type AdvertisingReportCallback func(*BLEAdvertisingReport) bool
 
 type BLEScannerConfig struct {
 	StoreGAPMap         bool

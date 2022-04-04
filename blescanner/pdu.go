@@ -72,11 +72,18 @@ func (s *BLEScanner) handleScanResult(ad *hcievents.LEAdvertisingReportEvent) *h
 			Data:    ad.Data[i],
 		}
 
+		skip := false
+
 		s.Lock()
 		for _, m := range s.advertisingReportCallbacks {
-			m(&pkt)
+			if skip = m(&pkt); skip {
+				break
+			}
 		}
 		s.Unlock()
+		if skip {
+			continue
+		}
 
 		dev, isNew := s.getDevice(bleaddr, true)
 		if dev == nil {
