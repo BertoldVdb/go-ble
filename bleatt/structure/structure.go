@@ -192,7 +192,7 @@ func (c *Characteristic) Subscribe(ctx context.Context, handler ClientNotifyHand
 	} else {
 		delete(c.parent.parent.clientNotifyMap, handle)
 	}
-	defer c.parent.parent.clientNotifyMutex.Unlock()
+	c.parent.parent.clientNotifyMutex.Unlock()
 
 	_, err := c.parent.parent.clientWrite(ctx, c.ValueHandle.CCCHandle.Info.Handle, new, true)
 	return err
