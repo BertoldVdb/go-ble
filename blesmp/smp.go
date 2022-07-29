@@ -2,6 +2,7 @@ package blesmp
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"os"
 	"path"
@@ -20,7 +21,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type smpStoredLTKMapKey [6 + 6 + 2 + 1]byte
+type smpStoredLTKMapKey [19]byte
 
 type smpStoredLTK struct {
 	EDIV          uint16
@@ -30,15 +31,28 @@ type smpStoredLTK struct {
 	Bonded        bool
 }
 
-func makeSMPStoredLTKMapKey(isCentral bool, ia bleutil.BLEAddr, ra bleutil.BLEAddr) smpStoredLTKMapKey {
+func makeSMPStoredLTKMapKey(isCentral bool, ia bleutil.BLEAddr, ra bleutil.BLEAddr, EDIV uint16, Rand uint64) smpStoredLTKMapKey {
 	var result smpStoredLTKMapKey
 
-	ra.MacAddr.Encode(result[:])
-	ia.MacAddr.Encode(result[6:])
-	result[12] = byte(ia.MacAddrType & 1)
-	result[13] = byte(ra.MacAddrType & 1)
 	if isCentral {
-		result[14] = 1
+		result[0] = 1
+	}
+
+	ia.MacAddr.Encode(result[1:])
+	result[7] = byte(ia.MacAddrType & 1)
+
+	if !isCentral {
+		if EDIV == 0 && Rand == 0 {
+			result[8] = 1
+			ia.MacAddr.Encode(result[9:])
+			result[15] = byte(ia.MacAddrType & 1)
+		} else {
+			binary.LittleEndian.PutUint16(result[9:], EDIV)
+			binary.LittleEndian.PutUint64(result[11:], Rand)
+		}
+	} else {
+		ra.MacAddr.Encode(result[8:])
+		result[14] = byte(ra.MacAddrType & 1)
 	}
 
 	return result

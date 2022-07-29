@@ -359,7 +359,10 @@ func (c *SMPConn) handlePairingRandom(rand []byte) {
 
 func (c *SMPConn) updateLTK() {
 	c.parent.storedKeysPersist.Lock()
-	c.parent.storedKeys[makeSMPStoredLTKMapKey(c.isCentral, c.addrLELocal, c.addrLERemote)] = c.protocol.pairingLTK
+	if !c.isCentral {
+		c.parent.storedKeys[makeSMPStoredLTKMapKey(c.isCentral, c.addrLELocal, c.addrLERemote, 0, 0)] = c.protocol.pairingLTK
+	}
+	c.parent.storedKeys[makeSMPStoredLTKMapKey(c.isCentral, c.addrLELocal, c.addrLERemote, c.protocol.pairingLTK.EDIV, c.protocol.pairingLTK.Rand)] = c.protocol.pairingLTK
 	c.parent.storedKeysPersist.Unlock()
 	err := c.parent.storedKeysPersist.Save()
 

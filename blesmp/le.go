@@ -61,7 +61,7 @@ func (s *SMP) connmgrLEGetKey(conn *hciconnmgr.Connection, event *hcievents.LELo
 	smpConn := conn.SMPConn.(*SMPConn)
 
 	s.storedKeysPersist.Lock()
-	ltk, ok := s.storedKeys[makeSMPStoredLTKMapKey(false, smpConn.addrLELocal, smpConn.addrLERemote)]
+	ltk, ok := s.storedKeys[makeSMPStoredLTKMapKey(false, smpConn.addrLELocal, smpConn.addrLERemote, event.EncryptedDiversifier, event.RandomNumber)]
 	s.storedKeysPersist.Unlock()
 	if !ok {
 		return nil, event
@@ -74,7 +74,7 @@ func (s *SMP) connmgrLEGetKey(conn *hciconnmgr.Connection, event *hcievents.LELo
 
 func (c *SMPConn) leTryEncryptLTK() error {
 	c.parent.storedKeysPersist.Lock()
-	ltk, ok := c.parent.storedKeys[makeSMPStoredLTKMapKey(true, c.addrLELocal, c.addrLERemote)]
+	ltk, ok := c.parent.storedKeys[makeSMPStoredLTKMapKey(true, c.addrLELocal, c.addrLERemote, 0, 0)]
 	c.parent.storedKeysPersist.Unlock()
 	if !ok {
 		return nil
