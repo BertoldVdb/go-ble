@@ -9,6 +9,7 @@ import (
 	"github.com/BertoldVdb/go-ble"
 	attperipheral "github.com/BertoldVdb/go-ble/bleatt/helpers/peripheral"
 	hcidrivers "github.com/BertoldVdb/go-ble/hci/drivers"
+	"github.com/BertoldVdb/go-ble/hci/drivers/btsnoop"
 	bleutil "github.com/BertoldVdb/go-ble/util"
 	bleutilparam "github.com/BertoldVdb/go-ble/util/param"
 	"github.com/BertoldVdb/go-misc/logrusconfig"
@@ -25,6 +26,7 @@ func main() {
 	serviceUUIDString := flag.String("uuid", "6e400001-b5a3-f393-e0a9-e50e24dcca9e", "Service UUID to use")
 	destination := flag.String("destination", "", "Address to connect to. When unset, return received data")
 	multiple := flag.Bool("multi", false, "Try to accept multiple connections")
+	logfile := flag.String("btsnoop", "", "Write btsnoop file to path")
 
 	logrusconfig.InitParam()
 	bleutilparam.Init()
@@ -44,6 +46,11 @@ func main() {
 	}
 
 	dev, err := hcidrivers.Open(devName)
+	if err != nil {
+		logger.Fatalln(err)
+	}
+
+	dev, err = btsnoop.WrapFile(dev, *logfile)
 	if err != nil {
 		logger.Fatalln(err)
 	}

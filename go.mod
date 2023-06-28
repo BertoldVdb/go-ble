@@ -1,14 +1,18 @@
 module github.com/BertoldVdb/go-ble
 
-go 1.14
+go 1.20
 
 require (
-	github.com/BertoldVdb/go-misc v0.1.5
+	github.com/BertoldVdb/go-misc v0.1.8
+	github.com/sirupsen/logrus v1.9.3
+	golang.org/x/sys v0.9.0
+)
+
+require (
 	github.com/BertoldVdb/logrus-prefixed-formatter v0.5.4 // indirect
-	github.com/gobuffalo/packr/v2 v2.8.1 // indirect
-	github.com/google/uuid v1.1.1
-	github.com/gorilla/websocket v1.4.2
-	github.com/sirupsen/logrus v1.8.1
-	github.com/sqs/goreturns v0.0.0-20181028201513-538ac6014518 // indirect
-	golang.org/x/sys v0.0.0-20201202213521-69691e467435
+	github.com/google/uuid v1.1.1 // indirect
+	github.com/mattn/go-colorable v0.1.7 // indirect
+	github.com/mattn/go-isatty v0.0.12 // indirect
+	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
+	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a // indirect
 )
