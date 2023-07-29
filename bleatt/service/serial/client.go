@@ -8,7 +8,7 @@ import (
 	"github.com/BertoldVdb/go-ble/bleatt"
 )
 
-func (s *SerialConfig) ClientFactory(conn io.ReadWriteCloser) func(ctx context.Context, dev *bleatt.GattDevice) {
+func (s *SerialConfig) ClientFactory(conn io.ReadWriteCloser, cb func(conn io.ReadWriteCloser)) func(ctx context.Context, dev *bleatt.GattDevice) {
 	readUUID := s.ReadUUID
 	if readUUID.IsZero() {
 		readUUID = s.ServiceUUID.CreateVariantAlt(1)
@@ -23,6 +23,10 @@ func (s *SerialConfig) ClientFactory(conn io.ReadWriteCloser) func(ctx context.C
 		defer conn.Close()
 		if dev == nil {
 			return
+		}
+
+		if cb != nil {
+			defer cb(nil)
 		}
 
 		go func() {
@@ -44,6 +48,10 @@ func (s *SerialConfig) ClientFactory(conn io.ReadWriteCloser) func(ctx context.C
 		charWr := serviceJbd.GetCharacteristic(writeUUID)
 		if charRd == nil || charWr == nil {
 			return
+		}
+
+		if cb != nil {
+			cb(conn)
 		}
 
 		var txMtx sync.Mutex
