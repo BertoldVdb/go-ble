@@ -14,6 +14,8 @@ import (
 
 type SerialConfig struct {
 	ServiceUUID bleutil.UUID
+	ReadUUID    bleutil.UUID
+	WriteUUID   bleutil.UUID
 	Connect     func() (io.ReadWriteCloser, error)
 	Secure      bool
 }
@@ -42,8 +44,18 @@ func (s *SerialNordic) CreateStructure(structure *attstructure.Structure) error 
 		secure = 0
 	}
 
+	readUUID := s.config.ReadUUID
+	if readUUID.IsZero() {
+		readUUID = s.config.ServiceUUID.CreateVariantAlt(1)
+	}
+
+	writeUUID := s.config.WriteUUID
+	if writeUUID.IsZero() {
+		writeUUID = s.config.ServiceUUID.CreateVariantAlt(2)
+	}
+
 	pspp := structure.AddPrimaryService(s.config.ServiceUUID)
-	pspp.AddCharacteristic(s.config.ServiceUUID.CreateVariantAlt(1), attstructure.CharacteristicWriteAck|attstructure.CharacteristicWriteNoAck|secure, attstructure.ValueConfig{
+	pspp.AddCharacteristic(readUUID, attstructure.CharacteristicWriteAck|attstructure.CharacteristicWriteNoAck|secure, attstructure.ValueConfig{
 		ValueWriteCb: func(h *attstructure.GATTHandle) error {
 			s.connMutex.Lock()
 			defer s.connMutex.Unlock()
@@ -52,7 +64,7 @@ func (s *SerialNordic) CreateStructure(structure *attstructure.Structure) error 
 			return err
 		},
 	})
-	s.dataTx = pspp.AddCharacteristic(s.config.ServiceUUID.CreateVariantAlt(2), attstructure.CharacteristicRead|attstructure.CharacteristicNotify|secure, attstructure.ValueConfig{})
+	s.dataTx = pspp.AddCharacteristic(writeUUID, attstructure.CharacteristicRead|attstructure.CharacteristicNotify|secure, attstructure.ValueConfig{})
 	return nil
 }
 
@@ -93,7 +105,6 @@ func (s *SerialNordic) Connected(conn hciconnmgr.BufferConn) error {
 				}
 				index += bytes
 			}
-
 		}
 	}()
 
