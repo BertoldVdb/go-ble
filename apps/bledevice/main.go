@@ -33,7 +33,7 @@ func main() {
 
 	flag.Parse()
 
-	logger := logrusconfig.GetLogger(0)
+	logger := logrusconfig.GetLogger(5)
 
 	serviceUUID, err := bleutil.UUIDFromString(*serviceUUIDString)
 	if err != nil {
@@ -50,9 +50,11 @@ func main() {
 		logger.Fatalln(err)
 	}
 
-	dev, err = btsnoop.WrapFile(dev, *logfile)
-	if err != nil {
-		logger.Fatalln(err)
+	if *logfile != "" {
+		dev, err = btsnoop.WrapFile(dev, *logfile)
+		if err != nil {
+			logger.Fatalln(err)
+		}
 	}
 
 	m := multirun.MultiRun{}

@@ -38,6 +38,15 @@ func UUIDFromBytes(value []byte) UUID {
 	return uuid
 }
 
+func (u UUID) IsZero() bool {
+	for _, v := range u {
+		if v != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func (u *UUID) GetLength() int {
 	if !bytes.Equal(u[:12], UUIDBase[:12]) {
 		return 16
