@@ -1543,6 +1543,13 @@ c|8|31|LE Remote Connection Parameter Request Reply|0x0020
  |4|Connection_Handle|2|
  |5|HCI_Command_Complete
 
+c|8|32|LE Remote Connection Parameter Request Negative Reply|0x0021
+ |3|Connection_Handle|2|
+ |3|Reason|1|
+ |4|Status|1|
+ |4|Connection_Handle|2|
+ |5|HCI_Command_Complete
+
 c|8|33|LE Set Data Length|0x0022
  |3|Connection_Handle|2|
  |3|TX_Octets|2|

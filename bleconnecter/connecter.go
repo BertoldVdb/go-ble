@@ -21,6 +21,7 @@ var (
 )
 
 type BLEConnecterConfig struct {
+	BLEUpdateParametersVerify func(c *BLEConnection, intervalMin uint16, intervalMax uint16, latency uint16, timeout uint16) bool
 }
 
 type BLEConnectionRole struct {

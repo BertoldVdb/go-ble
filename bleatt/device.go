@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 
 	attstructure "github.com/BertoldVdb/go-ble/bleatt/structure"
+	"github.com/BertoldVdb/go-ble/bleconnecter"
 	"github.com/BertoldVdb/go-ble/blesmp"
 	hciconnmgr "github.com/BertoldVdb/go-ble/hci/connmgr"
 	bleutil "github.com/BertoldVdb/go-ble/util"
@@ -33,6 +34,8 @@ type GattDevice struct {
 	clientStructure     *attstructure.Structure
 
 	smpConn *blesmp.SMPConn
+
+	bleConn *bleconnecter.BLEConnection
 }
 
 type gattDeviceConn struct {
@@ -53,6 +56,9 @@ type GattDeviceConfig struct {
 	Appearance              uint16
 	DiscoverRemoteOnConnect bool
 	MTU                     uint16
+
+	DiscoveryCacheGet func(dev *GattDevice) []*attstructure.GATTHandle
+	DiscoveryCacheSet func(dev *GattDevice, handles []*attstructure.GATTHandle)
 }
 
 func DefaultConfig() *GattDeviceConfig {
@@ -61,6 +67,16 @@ func DefaultConfig() *GattDeviceConfig {
 		DiscoverRemoteOnConnect: true,
 		DeviceName:              "go-ble device",
 	}
+}
+
+func NewGattDeviceWithConn(bleConn *bleconnecter.BLEConnection, externalStructure *attstructure.Structure, config *GattDeviceConfig) *GattDevice {
+	g := NewGattDevice(externalStructure, config)
+	g.bleConn = bleConn
+	return g
+}
+
+func (g *GattDevice) BLEConnection() *bleconnecter.BLEConnection {
+	return g.bleConn
 }
 
 func NewGattDevice(externalStructure *attstructure.Structure, config *GattDeviceConfig) *GattDevice {

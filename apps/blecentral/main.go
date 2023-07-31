@@ -11,6 +11,7 @@ import (
 	attcentral "github.com/BertoldVdb/go-ble/bleatt/helpers/central"
 	serviceserial "github.com/BertoldVdb/go-ble/bleatt/service/serial"
 	hcidrivers "github.com/BertoldVdb/go-ble/hci/drivers"
+	"github.com/BertoldVdb/go-ble/hci/drivers/btsnoop"
 	bleutil "github.com/BertoldVdb/go-ble/util"
 	bleutilparam "github.com/BertoldVdb/go-ble/util/param"
 	"github.com/BertoldVdb/go-misc/logrusconfig"
@@ -61,6 +62,7 @@ func main() {
 	serviceUUIDString := flag.String("uuid", "6e400001-b5a3-f393-e0a9-e50e24dcca9e", "Service UUID to use")
 	rdUUIDString := flag.String("rduuid", "", "Read UUID to use")
 	wrUUIDString := flag.String("wruuid", "", "Write UUID to use")
+	logfile := flag.String("btsnoop", "", "Write btsnoop file to path")
 	bleutilparam.Init()
 	logrusconfig.InitParam()
 	flag.Parse()
@@ -80,6 +82,13 @@ func main() {
 	dev, err := hcidrivers.Open(devName)
 	if err != nil {
 		log.Fatalln(err)
+	}
+
+	if *logfile != "" {
+		dev, err = btsnoop.WrapFile(dev, *logfile)
+		if err != nil {
+			logger.Fatalln(err)
+		}
 	}
 
 	config := ble.DefaultConfig()

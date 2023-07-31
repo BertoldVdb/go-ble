@@ -25,6 +25,25 @@ type BLEConnectionParametersRequested struct {
 }
 
 func (c *BLEConnecter) leConnectionParameterRequestHandler(event *hcievents.LERemoteConnectionParameterRequestEvent) *hcievents.LERemoteConnectionParameterRequestEvent {
+	hwConn := c.ctrl.ConnMgr.FindConnectionByHandle(event.ConnectionHandle)
+	reject := hwConn == nil
+
+	if !reject && c.config.BLEUpdateParametersVerify != nil {
+		if bleconn, ok := hwConn.AppConn.(*BLEConnection); ok {
+			reject = !c.config.BLEUpdateParametersVerify(bleconn, event.IntervalMin, event.IntervalMax, event.Latency, event.Timeout)
+		}
+	}
+
+	if reject {
+		c.logger.WithField("0handle", event.ConnectionHandle).Debug("Rejecting connection parameters update")
+		go c.ctrl.Cmds.LERemoteConnectionParameterRequestNegativeReplySync(
+			hcicommands.LERemoteConnectionParameterRequestNegativeReplyInput{
+				ConnectionHandle: event.ConnectionHandle,
+				Reason:           0x3b, /* Unacceptable Connection Parameters */
+			}, nil)
+		return event
+	}
+
 	c.logger.WithField("0handle", event.ConnectionHandle).Debug("Accepting connection parameters update")
 
 	go c.ctrl.Cmds.LERemoteConnectionParameterRequestReplySync(

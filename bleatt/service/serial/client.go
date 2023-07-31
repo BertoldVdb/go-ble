@@ -6,19 +6,10 @@ import (
 	"sync"
 
 	"github.com/BertoldVdb/go-ble/bleatt"
+	attstructure "github.com/BertoldVdb/go-ble/bleatt/structure"
 )
 
 func (s *SerialConfig) ClientFactory(conn io.ReadWriteCloser, cb func(conn io.ReadWriteCloser)) func(ctx context.Context, dev *bleatt.GattDevice) {
-	readUUID := s.ReadUUID
-	if readUUID.IsZero() {
-		readUUID = s.ServiceUUID.CreateVariantAlt(1)
-	}
-
-	writeUUID := s.WriteUUID
-	if writeUUID.IsZero() {
-		writeUUID = s.ServiceUUID.CreateVariantAlt(2)
-	}
-
 	return func(ctx context.Context, dev *bleatt.GattDevice) {
 		defer conn.Close()
 		if dev == nil {
@@ -39,13 +30,30 @@ func (s *SerialConfig) ClientFactory(conn io.ReadWriteCloser, cb func(conn io.Re
 			return
 		}
 
-		serviceJbd := structure.GetService(s.ServiceUUID)
-		if serviceJbd == nil {
+		service := structure.GetService(s.ServiceUUID)
+		if service == nil {
 			return
 		}
 
-		charRd := serviceJbd.GetCharacteristic(readUUID)
-		charWr := serviceJbd.GetCharacteristic(writeUUID)
+		var charRd, charWr *attstructure.Characteristic
+		if !s.ReadUUID.IsZero() {
+			charRd = service.GetCharacteristic(s.ReadUUID)
+		}
+		if !s.WriteUUID.IsZero() {
+			charWr = service.GetCharacteristic(s.WriteUUID)
+		}
+
+		/* If no characteristic UUID given, search for usable ones */
+		for _, m := range service.GetCharacteristics() {
+			flags := m.GetFlags()
+			if charWr == nil && ((flags&attstructure.CharacteristicWriteNoAck > 0) || (flags&attstructure.CharacteristicWriteAck > 0)) {
+				charWr = m
+			}
+			if charRd == nil && ((flags&attstructure.CharacteristicIndicate > 0) || (flags&attstructure.CharacteristicNotify > 0)) {
+				charRd = m
+			}
+		}
+
 		if charRd == nil || charWr == nil {
 			return
 		}

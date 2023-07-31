@@ -41,6 +41,7 @@ type L2CAP struct {
 }
 
 type L2CAPConfig struct {
+	BLEUpdateParametersVerify func(c *bleconnecter.BLEConnection, intervalMin uint16, intervalMax uint16, latency uint16, timeout uint16) bool
 }
 
 type L2CAPConnAccepter func() hciconnmgr.BufferConn

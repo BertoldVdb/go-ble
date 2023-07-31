@@ -3,6 +3,7 @@ package blel2cap
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 
 	"github.com/BertoldVdb/go-ble/bleconnecter"
 	bleutil "github.com/BertoldVdb/go-ble/util"
@@ -148,12 +149,17 @@ func (s *signalling) signallingProcess(cid uint16, code uint8, id uint8, payload
 		case SigConnectionParametereUpdateReq:
 			conn, ok := s.l.conn.(*bleconnecter.BLEConnection)
 			if ok && len(s.paramBuf) == 4 {
-				result := conn.UpdateParams(bleconnecter.BLEConnectionParametersRequested{
-					ConnectionIntervalMin: s.paramBuf[0],
-					ConnectionIntervalMax: s.paramBuf[1],
-					ConnectionLatency:     s.paramBuf[2],
-					SupervisionTimeout:    s.paramBuf[3],
-				})
+				var result error
+				if s.l.config == nil || s.l.config.BLEUpdateParametersVerify == nil || s.l.config.BLEUpdateParametersVerify(conn, s.paramBuf[0], s.paramBuf[1], s.paramBuf[2], s.paramBuf[3]) {
+					result = conn.UpdateParams(bleconnecter.BLEConnectionParametersRequested{
+						ConnectionIntervalMin: s.paramBuf[0],
+						ConnectionIntervalMax: s.paramBuf[1],
+						ConnectionLatency:     s.paramBuf[2],
+						SupervisionTimeout:    s.paramBuf[3],
+					})
+				} else {
+					result = errors.New("rejected")
+				}
 
 				return s.signallingCommandUint16(payload, cid, id, SigConnectionParametereUpdateRsp, signallingErrorToUint16(result, 0, 1))
 			}
@@ -161,8 +167,6 @@ func (s *signalling) signallingProcess(cid uint16, code uint8, id uint8, payload
 
 		return s.signallingCommandUint16(payload, cid, id, SigCommandRejectRsp, 0)
 	}
-
-	return nil, false
 }
 
 func (s *signalling) signallingWriteResponse(cid uint16, code uint8, id uint8, payload *pdu.PDU) error {

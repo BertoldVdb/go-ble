@@ -19,6 +19,7 @@ type CentralHelperConfig struct {
 	ConnectionParametersRequested bleconnecter.BLEConnectionParametersRequested
 	GATTConfig                    *bleatt.GattDeviceConfig
 	SMPConnConfig                 *blesmp.SMPConnConfig
+	L2CAPConfig                   *blel2cap.L2CAPConfig
 }
 
 func DefaultConfig() CentralHelperConfig {
@@ -209,9 +210,9 @@ func (p *CentralHelper) handleConn(conn *bleconnecter.BLEConnection, peer *Peer,
 		p.PeerRemove(peer)
 	}()
 
-	dev := bleatt.NewGattDevice(attstructure.NewStructure(), p.config.GATTConfig)
+	dev := bleatt.NewGattDeviceWithConn(conn, attstructure.NewStructure(), p.config.GATTConfig)
 
-	l2 := blel2cap.New(conn, nil, func(psm blel2cap.PSMType, accept blel2cap.L2CAPConnAccepter) {
+	l2 := blel2cap.New(conn, p.config.L2CAPConfig, func(psm blel2cap.PSMType, accept blel2cap.L2CAPConnAccepter) {
 		switch psm {
 		case blel2cap.PSMTypeATT:
 			dev.AddConn(accept())

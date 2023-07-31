@@ -464,29 +464,38 @@ func (a *attClient) discoverRemoteDeviceStructure() (*attstructure.Structure, er
 	/* With a high MTU this goes so much faster */
 	a.parent.getMTUBlocking()
 
-	ctx := context.Background()
-
-	handles, err := a.findInformationAll(ctx, 1, 0xFFFF)
-	if err != nil {
-		return nil, err
+	var gattHandles []*attstructure.GATTHandle
+	if a.parent.parent.config.DiscoveryCacheGet != nil {
+		gattHandles = a.parent.parent.config.DiscoveryCacheGet(a.parent.parent)
 	}
 
-	var gattHandles []*attstructure.GATTHandle
-	for _, m := range handles {
-		handle := &attstructure.GATTHandle{
-			Info: m,
+	cacheStr := ""
+	if gattHandles == nil {
+		ctx := context.Background()
+
+		handles, err := a.findInformationAll(ctx, 1, 0xFFFF)
+		if err != nil {
+			return nil, err
 		}
 
-		/* If it is descriptive, try to read it */
-		if isPartOfGATTDatabase(m.UUID) > 0 {
-			value, attErr, err := a.readHandleAll(ctx, m.Handle, nil)
-			if attErr > 0 || err != nil {
-				return nil, err
+		for _, m := range handles {
+			handle := &attstructure.GATTHandle{
+				Info: m,
 			}
-			handle.Value = value
-		}
 
-		gattHandles = append(gattHandles, handle)
+			/* If it is descriptive, try to read it */
+			if isPartOfGATTDatabase(m.UUID) > 0 {
+				value, attErr, err := a.readHandleAll(ctx, m.Handle, nil)
+				if attErr > 0 || err != nil {
+					return nil, err
+				}
+				handle.Value = value
+			}
+
+			gattHandles = append(gattHandles, handle)
+		}
+	} else {
+		cacheStr = " (cached)"
 	}
 
 	for _, m := range gattHandles {
@@ -494,9 +503,17 @@ func (a *attClient) discoverRemoteDeviceStructure() (*attstructure.Structure, er
 			"1uuid":   m.Info.UUID,
 			"0handle": m.Info.Handle,
 			"2data":   hex.EncodeToString(m.Value),
-		}).Debug("Discovered characteristic")
+		}).Debug("Discovered characteristic" + cacheStr)
 	}
 
-	return attstructure.ImportStructure(gattHandles, a.parent.parent.ClientRead, a.parent.parent.ClientWrite)
-}
+	result, err := attstructure.ImportStructure(gattHandles, a.parent.parent.ClientRead, a.parent.parent.ClientWrite)
+	if err != nil {
+		return result, err
+	}
 
+	if a.parent.parent.config.DiscoveryCacheSet != nil {
+		a.parent.parent.config.DiscoveryCacheSet(a.parent.parent, gattHandles)
+	}
+
+	return result, nil
+}

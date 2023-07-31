@@ -2061,6 +2061,77 @@ log:
 
 	 return result, err
 }
+// LERemoteConnectionParameterRequestNegativeReplyInput represents the input of the command specified in Section 7.8.32
+type LERemoteConnectionParameterRequestNegativeReplyInput struct {
+	ConnectionHandle uint16
+	Reason uint8
+}
+
+func (i LERemoteConnectionParameterRequestNegativeReplyInput) encode(data []byte) []byte {
+	w := bleutil.Writer{Data: data};
+	binary.LittleEndian.PutUint16(w.Put(2), i.ConnectionHandle)
+	w.PutOne(uint8(i.Reason))
+	return w.Data
+}
+
+// LERemoteConnectionParameterRequestNegativeReplyOutput represents the output of the command specified in Section 7.8.32
+type LERemoteConnectionParameterRequestNegativeReplyOutput struct {
+	Status uint8
+	ConnectionHandle uint16
+}
+
+func (o *LERemoteConnectionParameterRequestNegativeReplyOutput) decode(data []byte) bool {
+	r := bleutil.Reader{Data: data};
+	o.Status = uint8(r.GetOne())
+	o.ConnectionHandle = binary.LittleEndian.Uint16(r.Get(2))
+	return r.Valid()
+}
+
+// LERemoteConnectionParameterRequestNegativeReplySync executes the command specified in Section 7.8.32 synchronously
+func (c *Commands) LERemoteConnectionParameterRequestNegativeReplySync (params LERemoteConnectionParameterRequestNegativeReplyInput, result *LERemoteConnectionParameterRequestNegativeReplyOutput) (*LERemoteConnectionParameterRequestNegativeReplyOutput, error) {
+	var err2 error
+	var response []byte
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		c.logger.WithFields(logrus.Fields{
+			 "0params": params,
+		}).Trace("LERemoteConnectionParameterRequestNegativeReply started")
+	}
+	if result == nil {
+		result = &LERemoteConnectionParameterRequestNegativeReplyOutput{}
+	}
+
+	buffer, err := c.hcicmdmgr.CommandRunGetBuffer(0, hcicmdmgr.HCICommand{OGF: 8, OCF: 0x0021}, nil)
+	if err != nil {
+		goto log
+	}
+
+	buffer.Buffer = params.encode(buffer.Buffer)
+	response, err = c.hcicmdmgr.CommandRunPutBuffer(buffer)
+	if err != nil {
+		goto log
+	}
+
+	if !result.decode(response) {
+		err = ErrorMalformed
+	}
+
+	err = HciErrorToGo(response, err)
+
+	err2 = c.hcicmdmgr.CommandRunReleaseBuffer(buffer)
+	if err2 != nil {
+		err = err2
+	}
+
+log:
+	if c.logger != nil && c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		c.logger.WithError(err).WithFields(logrus.Fields{
+			 "0params": params,
+			 "1result": result,
+		}).Debug("LERemoteConnectionParameterRequestNegativeReply completed")
+	}
+
+	 return result, err
+}
 // LESetDataLengthInput represents the input of the command specified in Section 7.8.33
 type LESetDataLengthInput struct {
 	ConnectionHandle uint16
