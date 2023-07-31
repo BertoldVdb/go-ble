@@ -188,6 +188,7 @@ func (c *Characteristic) Subscribe(ctx context.Context, handler ClientNotifyHand
 		} else if hasNotify {
 			new[0] = 1 << 0
 		}
+
 		c.parent.parent.clientNotifyMap[handle] = handler
 	} else {
 		delete(c.parent.parent.clientNotifyMap, handle)
@@ -229,6 +230,7 @@ func (s *Structure) InjectNotify(handle uint16, data []byte) {
 	s.clientNotifyMutex.Lock()
 	f, ok := s.clientNotifyMap[handle]
 	s.clientNotifyMutex.Unlock()
+
 	if ok && f != nil {
 		f(data)
 	}

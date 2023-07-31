@@ -64,6 +64,7 @@ func (p *PeripheralHelper) handleConn(conn hciconnmgr.BufferConn, remoteAddr net
 	gattConfig.DiscoverRemoteOnConnect = false
 
 	dev := bleatt.NewGattDevice(structure, gattConfig)
+	dev.RemoteAddr = remoteAddr
 
 	var err error
 

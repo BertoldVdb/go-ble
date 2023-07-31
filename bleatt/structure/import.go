@@ -102,6 +102,18 @@ func ImportStructure(gattHandles []*GATTHandle, rCb ClientReadHandler, wCb Clien
 				}
 			}
 
+			/* The Characteristic Value declaration contains the value of the characteristic. It
+			 * is the first Attribute after the characteristic declaration. All characteristic
+			 * definitions shall have a Characteristic Value declaration.
+			 *
+			 * I have seen a (TELink based) device that puts garbage information in the value handle above, so
+			 * we need to get the handle from the characteristic value... OTOH, not all devices provide the
+			 * value descriptor in a full scan so we need both mechanisms...
+			 */
+			if m.Info.UUID == currentCharacteristic.uuid && currentCharacteristic.ValueHandle != nil {
+				currentCharacteristic.ValueHandle.Info.Handle = m.Info.Handle
+			}
+
 			if currentCharacteristic != nil {
 				if m.Info.UUID == UUIDCharacteristicClientConfiguration {
 					currentCharacteristic.ValueHandle.CCCHandle = m
