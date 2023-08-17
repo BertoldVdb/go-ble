@@ -176,6 +176,10 @@ func (d *BLEDevice) GetName() string {
 	return name
 }
 
+func (dev *BLEDevice) GetAddr() bleutil.BLEAddr {
+	return dev.addr
+}
+
 func (d *BLEDevice) handleFlags(gap *GAPRecord) {
 	if len(gap.Data) >= 1 {
 		d.flags = gap.Data[0]
