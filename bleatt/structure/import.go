@@ -38,7 +38,7 @@ func ImportStructure(gattHandles []*GATTHandle, rCb ClientReadHandler, wCb Clien
 
 	for _, m := range gattHandles {
 		if m.Info.UUID == UUIDIncludedService {
-			return nil, errors.New("Including services is not supported (TODO)")
+			return nil, errors.New("including services is not supported (TODO)")
 		}
 
 		if m.Info.UUID == UUIDPrimaryService || m.Info.UUID == UUIDSecondaryService {
@@ -67,7 +67,7 @@ func ImportStructure(gattHandles []*GATTHandle, rCb ClientReadHandler, wCb Clien
 			}
 		} else {
 			if currentService == nil {
-				return nil, errors.New("This item must be in a service definition")
+				return nil, errors.New("this item must be in a service definition")
 			}
 
 			/* The standard says you can have multiple characteristic definitions with
@@ -88,9 +88,10 @@ func ImportStructure(gattHandles []*GATTHandle, rCb ClientReadHandler, wCb Clien
 				}
 
 				currentCharacteristic = &Characteristic{
-					parent: currentService,
-					uuid:   uuid,
-					flags:  flags,
+					parent:      currentService,
+					uuid:        uuid,
+					flags:       flags,
+					valueIsNext: true,
 					ValueHandle: &GATTHandle{
 						Info: HandleInfo{
 							Handle:    handle,
@@ -100,21 +101,27 @@ func ImportStructure(gattHandles []*GATTHandle, rCb ClientReadHandler, wCb Clien
 						},
 					},
 				}
+
+				continue
 			}
 
 			/* The Characteristic Value declaration contains the value of the characteristic. It
 			 * is the first Attribute after the characteristic declaration. All characteristic
 			 * definitions shall have a Characteristic Value declaration.
 			 *
-			 * I have seen a (TELink based) device that puts garbage information in the value handle above, so
-			 * we need to get the handle from the characteristic value... OTOH, not all devices provide the
-			 * value descriptor in a full scan so we need both mechanisms...
+			 * I have seen a (TELink based) device that puts garbage information in the value handle and UUID above, so
+			 * we need to parse it again here. Hoever, I have also seen some devices that did not value declarations in the
+			 * full scan, so use both mechanisms.
 			 */
-			if m.Info.UUID == currentCharacteristic.uuid && currentCharacteristic.ValueHandle != nil {
-				currentCharacteristic.ValueHandle.Info.Handle = m.Info.Handle
-			}
-
 			if currentCharacteristic != nil {
+				if currentCharacteristic.valueIsNext {
+					currentCharacteristic.valueIsNext = false
+					currentCharacteristic.uuid = m.Info.UUID
+					currentCharacteristic.ValueHandle.Info.UUID = m.Info.UUID
+					currentCharacteristic.ValueHandle.Info.UUIDWidth = m.Info.UUIDWidth
+					currentCharacteristic.ValueHandle.Info.Handle = m.Info.Handle
+				}
+
 				if m.Info.UUID == UUIDCharacteristicClientConfiguration {
 					currentCharacteristic.ValueHandle.CCCHandle = m
 				}

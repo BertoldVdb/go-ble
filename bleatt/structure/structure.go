@@ -40,6 +40,7 @@ type Characteristic struct {
 
 	valueConfig ValueConfig
 
+	valueIsNext bool
 	ValueHandle *GATTHandle
 }
 
