@@ -115,8 +115,6 @@ func (jg *ScanJSONGenerator) generateJSONLocked() ([]byte, error) {
 		}
 
 		jg.results.Devices = append(jg.results.Devices, device)
-
-		dev.Release()
 	}
 
 	jsb, err := json.MarshalIndent(jg.results, "", "  ")

@@ -181,23 +181,32 @@ func (c *Characteristic) Subscribe(ctx context.Context, handler ClientNotifyHand
 
 	new := []byte{0, 0}
 	handle := c.ValueHandle.Info.Handle
-
-	c.parent.parent.clientNotifyMutex.Lock()
 	if handler != nil {
 		if hasIndicate {
 			new[0] = 1 << 1
 		} else if hasNotify {
 			new[0] = 1 << 0
 		}
+	}
 
+	/* Issue the CCCD write first; only register/unregister the handler
+	   after the peer accepts the subscription. Otherwise a failed CCCD
+	   write would leave a dangling handler that would fire on any
+	   peer-sent notification (and an unsubscribe failure would leave a
+	   stale handler bound). */
+	_, err := c.parent.parent.clientWrite(ctx, c.ValueHandle.CCCHandle.Info.Handle, new, true)
+	if err != nil {
+		return err
+	}
+
+	c.parent.parent.clientNotifyMutex.Lock()
+	if handler != nil {
 		c.parent.parent.clientNotifyMap[handle] = handler
 	} else {
 		delete(c.parent.parent.clientNotifyMap, handle)
 	}
 	c.parent.parent.clientNotifyMutex.Unlock()
-
-	_, err := c.parent.parent.clientWrite(ctx, c.ValueHandle.CCCHandle.Info.Handle, new, true)
-	return err
+	return nil
 }
 
 func (s Structure) String() string {

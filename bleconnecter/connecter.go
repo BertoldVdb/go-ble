@@ -17,7 +17,8 @@ import (
 )
 
 var (
-	ErrorClosed = errors.New("Connecter is closed")
+	ErrorClosed   = errors.New("Connecter is closed")
+	ErrorNoPeers  = errors.New("Connect requires at least one peer address")
 )
 
 type BLEConnecterConfig struct {
@@ -41,6 +42,11 @@ type BLEConnecter struct {
 	closeflag closeflag.CloseFlag
 
 	roles [2]BLEConnectionRole
+
+	/* Bounded queue of pending HCI replies to peer-issued events
+	   (param-update requests, etc). Replacing per-event `go func()`
+	   spawn so a peer flooding requests cannot exhaust goroutines. */
+	replyCh chan func() error
 }
 
 type BLEConnection struct {
@@ -77,11 +83,15 @@ func (c *BLEConnection) Encrypt(ediv uint16, rand uint64, ltk [16]byte) error {
 }
 
 func New(logger *logrus.Entry, ctrl *hci.Controller, advertiser *bleadvertiser.BLEAdvertiser, config *BLEConnecterConfig) *BLEConnecter {
+	if config == nil {
+		config = &BLEConnecterConfig{}
+	}
 	e := &BLEConnecter{
 		logger:     logger,
 		config:     config,
 		ctrl:       ctrl,
 		advertiser: advertiser,
+		replyCh:    make(chan func() error, 16),
 	}
 
 	for i := range e.roles {
@@ -120,14 +130,14 @@ func (c *BLEConnecter) leConnectionCompleteHandler(event *hcievents.LEConnection
 	rightPeer := false
 
 	if role.peerValid {
-		if role.peer.peerAddrCandidates == nil {
-			rightPeer = true
-		} else {
-			for _, m := range role.peer.peerAddrCandidates {
-				if m == remoteAddr {
-					rightPeer = true
-					break
-				}
+		/* peerAddrCandidates must be non-empty: Connect() rejects nil/empty
+		   inputs, and the central success path explicitly clears the list
+		   after a successful connection so subsequent racing events do not
+		   wildcard-match. */
+		for _, m := range role.peer.peerAddrCandidates {
+			if m == remoteAddr {
+				rightPeer = true
+				break
 			}
 		}
 	}
@@ -140,6 +150,22 @@ func (c *BLEConnecter) leConnectionCompleteHandler(event *hcievents.LEConnection
 		if hwConn != nil {
 			hwConn.AppConn = role.peer
 		}
+		/* Seed parametersActual with the just-negotiated values *here*
+		   rather than after Connect resumes. The peripheral side issues
+		   an auto-UpdateParams immediately after Connect returns, which
+		   triggers an LEConnectionUpdateComplete on the central; if
+		   Connect set parametersActual from `event` *after* that update
+		   handler ran, it would clobber the newer values with the
+		   initial ones. Doing it here means parametersActual is correct
+		   as soon as the connection is visible, and subsequent update
+		   events monotonically refine it. */
+		role.peer.parametersMutex.Lock()
+		role.peer.parametersActual = BLEConnectionParametersActual{
+			Interval: event.ConnectionInterval,
+			Latency:  event.ConnectionLatency,
+			Timeout:  event.SupervisionTimeout,
+		}
+		role.peer.parametersMutex.Unlock()
 		role.peerResponse <- struct{}{}
 	}
 
@@ -170,18 +196,31 @@ func (c *BLEConnecter) Run() error {
 		return err
 	}
 
-	/* Failure of these two is harmless */
-	c.ctrl.Events.SetLERemoteConnectionParameterRequestEventCallback(c.leConnectionParameterRequestHandler)
-	c.ctrl.Events.SetLEConnectionUpdateCompleteEventCallback(c.leConnectionUpdateCompleteHandler)
+	if err := c.ctrl.Events.SetLERemoteConnectionParameterRequestEventCallback(c.leConnectionParameterRequestHandler); err != nil {
+		c.logger.WithError(err).Warn("Failed to register LERemoteConnectionParameterRequest callback; the BLEUpdateParametersVerify gate will not run for this controller")
+	}
+	if err := c.ctrl.Events.SetLEConnectionUpdateCompleteEventCallback(c.leConnectionUpdateCompleteHandler); err != nil {
+		c.logger.WithError(err).Warn("Failed to register LEConnectionUpdateComplete callback")
+	}
 
 	/* Activate the connect calls */
 	for i := range c.roles {
 		c.roles[i].singleChan <- struct{}{}
 	}
 
-	<-c.closeflag.Chan()
-
-	return nil
+	/* Single worker drains replyCh — bounds peer-driven goroutine
+	   creation. The handlers post closures to replyCh non-blocking;
+	   if the queue is full the request is dropped and logged. */
+	for {
+		select {
+		case <-c.closeflag.Chan():
+			return nil
+		case fn := <-c.replyCh:
+			if err := fn(); err != nil {
+				c.logger.WithError(err).Debug("Connecter reply HCI command failed")
+			}
+		}
+	}
 }
 
 func (c *BLEConnecter) Close() error {
@@ -190,6 +229,16 @@ func (c *BLEConnecter) Close() error {
 
 func (c *BLEConnecter) Connect(ctx context.Context, isCentral bool, peerAddrs []bleutil.BLEAddr, request BLEConnectionParametersRequested) (*BLEConnection, []bleutil.BLEAddr, error) {
 	var err error
+
+	/* Refuse to connect with no peers. Previously a nil/empty list was
+	   silently treated as "accept any peer" by the connection-complete
+	   handler — a serious authorization gap, especially in peripheral mode
+	   (where the LL allowlist is disabled). Callers that genuinely want
+	   "any peer" must opt in via a future AcceptAny flag rather than
+	   overloading nil. */
+	if len(peerAddrs) == 0 {
+		return nil, peerAddrs, ErrorNoPeers
+	}
 
 	roleID := 0
 	if !isCentral {
@@ -347,13 +396,9 @@ func (c *BLEConnecter) Connect(ctx context.Context, isCentral bool, peerAddrs []
 		"0addr":   conn.peerAddr,
 		"1handle": conn.event.ConnectionHandle}).Info("Connection established")
 
-	conn.parametersMutex.Lock()
-	conn.parametersActual = BLEConnectionParametersActual{
-		Interval: conn.event.ConnectionInterval,
-		Latency:  conn.event.ConnectionLatency,
-		Timeout:  conn.event.SupervisionTimeout,
-	}
-	conn.parametersMutex.Unlock()
+	/* parametersActual was seeded in leConnectionCompleteHandler so a
+	   peer-initiated update arriving before Connect resumes here can't
+	   be clobbered. */
 
 	if !conn.isCentral {
 		conn.UpdateParams(request)
@@ -374,4 +419,13 @@ func (c *BLEConnecter) Connect(ctx context.Context, isCentral bool, peerAddrs []
 
 func (c *BLEConnection) IsCentral() bool {
 	return c.isCentral
+}
+
+// GetActualParameters returns a snapshot of the connection's currently-
+// negotiated parameters (interval, latency, supervision timeout). The
+// snapshot is updated by the LEConnectionUpdateComplete event handler.
+func (c *BLEConnection) GetActualParameters() BLEConnectionParametersActual {
+	c.parametersMutex.RLock()
+	defer c.parametersMutex.RUnlock()
+	return c.parametersActual
 }

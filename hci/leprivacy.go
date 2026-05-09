@@ -53,6 +53,19 @@ func (c *Controller) GetOwnAddress(t bleutil.MacAddrType) bleutil.BLEAddr {
 }
 
 func (c *Controller) setLERandomAddress() error {
+	/* Validate the random-bit budget. Anything below 32 leaks too much
+	   of the public BD_ADDR into the "private" address — privacy is
+	   then a thin veneer. The static-random / RPA top bits cost 2 of
+	   the 48, leaving 46 random bits at most. */
+	bits := c.config.LERandomAddrBits
+	if bits <= 0 || bits > 46 {
+		bits = 46
+	}
+	if bits < 32 {
+		c.logger.WithField("0bits", bits).Warn("LERandomAddrBits below 32 leaks too much BD_ADDR; clamping to 32")
+		bits = 32
+	}
+
 	/* Read 48 random bits */
 	var value uint64
 
@@ -72,7 +85,7 @@ func (c *Controller) setLERandomAddress() error {
 
 	/* Randomize last x bits */
 	c.Info.RandomAddr = c.Info.BdAddr.BDADDR
-	c.Info.RandomAddr ^= bleutil.MacAddr(value >> (48 - c.config.LERandomAddrBits))
+	c.Info.RandomAddr ^= bleutil.MacAddr(value >> (48 - bits))
 
 	/* Two MSB must be one */
 	c.Info.RandomAddr |= 0x3 << (48 - 2)

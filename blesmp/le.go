@@ -58,7 +58,13 @@ func (c *SMPConn) leEncrypt(ltk smpStoredLTK) error {
 }
 
 func (s *SMP) connmgrLEGetKey(conn *hciconnmgr.Connection, event *hcievents.LELongTermKeyRequestEvent) ([]byte, *hcievents.LELongTermKeyRequestEvent) {
-	smpConn := conn.SMPConn.(*SMPConn)
+	smpConn := smpConnFromConn(conn)
+	if smpConn == nil {
+		// Connection has no SMP yet — answer with NegativeReply by
+		// returning a non-16-byte key. The connmgr's LTK request
+		// handler interprets that as "no key available".
+		return nil, event
+	}
 
 	s.storedKeysPersist.Lock()
 	ltk, ok := s.storedKeys[makeSMPStoredLTKMapKey(false, smpConn.addrLELocal, smpConn.addrLERemote, event.EncryptedDiversifier, event.RandomNumber)]
@@ -84,6 +90,13 @@ func (c *SMPConn) leTryEncryptLTK() error {
 	if err != nil {
 		return err
 	}
+
+	/* leEncryptWait drained the EncryptionChange signal that smpHandler
+	   would otherwise consume to transition state to Secure, so do it
+	   here. Without this the cached-LTK fast path leaves SMP in
+	   StateInsecure even though the link is fully encrypted, which makes
+	   GetSecurity() report unencrypted and breaks GoSecure(ctx, false). */
+	c.setState(StateSecure)
 
 	return nil
 }

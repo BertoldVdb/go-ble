@@ -14,7 +14,9 @@ type BLEDevice struct {
 	cbMutex sync.Mutex
 	cb      DeviceUpdatedCallback
 
-	/* All next fields are safe to access with the mutex */
+	/* All fields below are protected by this RWMutex. Public getters
+	   acquire it themselves; callers no longer need to bracket reads
+	   with GetDevice/Release. */
 	sync.RWMutex
 	addr            bleutil.BLEAddr
 	rssi            int8
@@ -107,16 +109,11 @@ func (s *BLEScanner) handleTimeout() {
 	}
 }
 
+// GetDevice returns the tracked BLEDevice for the given address, or nil
+// if not found. Every public getter on the returned device self-locks.
 func (s *BLEScanner) GetDevice(addr bleutil.BLEAddr) *BLEDevice {
 	dev, _ := s.getDevice(addr, false)
-	if dev != nil {
-		dev.RLock()
-	}
 	return dev
-}
-
-func (dev *BLEDevice) Release() {
-	dev.RUnlock()
 }
 
 func (s *BLEScanner) KnownDevicesAddresses(result []bleutil.BLEAddr) []bleutil.BLEAddr {
@@ -143,14 +140,20 @@ func (dev *BLEDevice) isExpired() bool {
 }
 
 func (dev *BLEDevice) LastSeen() time.Time {
+	dev.RLock()
+	defer dev.RUnlock()
 	return dev.lastSeenDev
 }
 
 func (dev *BLEDevice) GetRSSI() int8 {
+	dev.RLock()
+	defer dev.RUnlock()
 	return dev.rssi
 }
 
 func (dev *BLEDevice) IsConnectable() bool {
+	dev.RLock()
+	defer dev.RUnlock()
 	return !time.Now().After(dev.lastConnectable.Add(2 * time.Second))
 }
 

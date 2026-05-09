@@ -15,6 +15,11 @@ type GAPCallback func(*BLEDevice, *GAPRecord)
 type DeviceUpdatedCallback func(*BLEDevice)
 type AdvertisingReportCallback func(*BLEAdvertisingReport) bool
 
+// CallbackHandle uniquely identifies a callback registered via
+// RegisterDeviceUpdateCallback or RegisterAdvertisingReportCallback so
+// it can later be removed. A zero value is never returned.
+type CallbackHandle uint64
+
 type BLEScannerConfig struct {
 	StoreGAPMap         bool
 	ScanCycleDurationMs int
@@ -22,6 +27,16 @@ type BLEScannerConfig struct {
 
 	LEScanInterval uint16
 	LEScanWindow   uint16
+}
+
+type registeredDeviceUpdateCB struct {
+	handle CallbackHandle
+	cb     DeviceUpdatedCallback
+}
+
+type registeredAdvReportCB struct {
+	handle CallbackHandle
+	cb     AdvertisingReportCallback
 }
 
 type BLEScanner struct {
@@ -33,14 +48,18 @@ type BLEScanner struct {
 
 	devices                      map[uint64]*BLEDevice
 	manufacturerSpecificCallback map[uint16]GAPCallback
-	deviceUpdatedCallbacks       []DeviceUpdatedCallback
-	advertisingReportCallbacks   []AdvertisingReportCallback
+	deviceUpdatedCallbacks       []registeredDeviceUpdateCB
+	advertisingReportCallbacks   []registeredAdvReportCB
+	nextCallbackHandle           CallbackHandle
 	scanType                     int
 
 	nextCleanup time.Time
 }
 
 func New(logger *logrus.Entry, ctrl *hci.Controller, config *BLEScannerConfig) *BLEScanner {
+	if config == nil {
+		config = &BLEScannerConfig{}
+	}
 	e := &BLEScanner{
 		logger:                       logger,
 		config:                       config,
@@ -114,7 +133,7 @@ func (s *BLEScanner) Run() error {
 		return err
 	}
 
-	if s.config.ScanCycleDurationMs == 0 {
+	if s.config.ScanCycleDurationMs <= 0 {
 		s.config.ScanCycleDurationMs = 10000
 		s.config.ScanCycleActiveDuty = 0.25
 	}
@@ -168,18 +187,54 @@ func (s *BLEScanner) Close() error {
 	return s.close.Close()
 }
 
-func (s *BLEScanner) RegisterDeviceUpdateCallback(cb DeviceUpdatedCallback) {
+// RegisterDeviceUpdateCallback returns a handle that can later be passed
+// to UnregisterDeviceUpdateCallback. Long-running apps that re-register
+// transient handlers should always unregister them or the slice will
+// grow without bound and dispatch will slow down linearly.
+func (s *BLEScanner) RegisterDeviceUpdateCallback(cb DeviceUpdatedCallback) CallbackHandle {
 	s.Lock()
 	defer s.Unlock()
 
-	s.deviceUpdatedCallbacks = append(s.deviceUpdatedCallbacks, cb)
+	s.nextCallbackHandle++
+	h := s.nextCallbackHandle
+	s.deviceUpdatedCallbacks = append(s.deviceUpdatedCallbacks, registeredDeviceUpdateCB{handle: h, cb: cb})
+	return h
 }
 
-func (s *BLEScanner) RegisterAdvertisingReportCallback(cb AdvertisingReportCallback) {
+func (s *BLEScanner) UnregisterDeviceUpdateCallback(handle CallbackHandle) {
+	s.Lock()
+	defer s.Unlock()
+	out := s.deviceUpdatedCallbacks[:0]
+	for _, e := range s.deviceUpdatedCallbacks {
+		if e.handle != handle {
+			out = append(out, e)
+		}
+	}
+	s.deviceUpdatedCallbacks = out
+}
+
+// RegisterAdvertisingReportCallback returns a handle that can later be
+// passed to UnregisterAdvertisingReportCallback.
+func (s *BLEScanner) RegisterAdvertisingReportCallback(cb AdvertisingReportCallback) CallbackHandle {
 	s.Lock()
 	defer s.Unlock()
 
-	s.advertisingReportCallbacks = append(s.advertisingReportCallbacks, cb)
+	s.nextCallbackHandle++
+	h := s.nextCallbackHandle
+	s.advertisingReportCallbacks = append(s.advertisingReportCallbacks, registeredAdvReportCB{handle: h, cb: cb})
+	return h
+}
+
+func (s *BLEScanner) UnregisterAdvertisingReportCallback(handle CallbackHandle) {
+	s.Lock()
+	defer s.Unlock()
+	out := s.advertisingReportCallbacks[:0]
+	for _, e := range s.advertisingReportCallbacks {
+		if e.handle != handle {
+			out = append(out, e)
+		}
+	}
+	s.advertisingReportCallbacks = out
 }
 
 func (s *BLEScanner) SetManufacturerSpecificCallback(id uint16, cb GAPCallback) {

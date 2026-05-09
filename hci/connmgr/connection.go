@@ -99,6 +99,11 @@ func (c *Connection) IsOpen() bool {
 
 // Close closes the connection.
 // Any blocked ReadFrom or WriteTo operations will be unblocked and return errors.
+//
+// The wait for the controller's Disconnection-Complete is bounded by
+// ConnectionManagerConfig.DisconnectTimeout. If the controller never
+// responds (e.g., transport hung) we synthesize the disconnected state
+// locally so shutdown can proceed.
 func (c *Connection) Close() error {
 	var err error
 
@@ -117,13 +122,27 @@ func (c *Connection) Close() error {
 		c.connmgr.logger.WithError(err).WithField("0handle", c.handle).Trace("Requested disconnect")
 
 		if err == nil {
-			<-c.closeChan
+			timeout := c.connmgr.config.DisconnectTimeout
+			if timeout <= 0 {
+				timeout = 5 * time.Second
+			}
+			t := time.NewTimer(timeout)
+			defer t.Stop()
+			select {
+			case <-c.closeChan:
+			case <-c.connmgr.closeflag.Chan():
+			case <-t.C:
+				c.connmgr.logger.WithField("0handle", c.handle).Warn("Disconnect timed out; forcing local teardown")
+				c.connmgr.Lock()
+				if existing, ok := c.connmgr.connections[c.handle]; ok && existing == c {
+					delete(c.connmgr.connections, c.handle)
+				}
+				c.connmgr.Unlock()
+				c.disconnected()
+			}
 		}
 
 		c.connmgr.logger.WithError(err).WithField("0handle", c.handle).Debug("Completed disconnect")
-		if c.connmgr.config.HookConnectionStateChange != nil {
-			c.connmgr.config.HookConnectionStateChange(c, false)
-		}
 	})
 
 	return err
@@ -157,12 +176,37 @@ func (c *Connection) disconnected() {
 			c.connmgr.txNewConnBlockTime = time.Now().Add(1000 * time.Millisecond)
 		}
 
+		/* Drain the per-connection RX FIFO so queued L2CAP buffers don't
+		   leak. (txFIFO was drained above; rxFIFO previously was not.) */
+		for {
+			buf := c.rxFIFO.Pop()
+			if buf == nil {
+				break
+			}
+			bleutil.ReleaseBuffer(buf)
+		}
+
 		c.connmgr.logger.WithField("0handle", c.handle).Info("Connection lost")
 
 		bleutil.ReleaseBuffer(c.rxPDU)
 		c.rxPDU = nil
 
 		close(c.closeChan)
+
+		/* Cancel any in-flight ReadFrom that captured rxContext. */
+		c.rxContextMutex.Lock()
+		if c.rxCancelFunc != nil {
+			c.rxCancelFunc()
+			c.rxCancelFunc = nil
+		}
+		c.rxContextMutex.Unlock()
+
+		/* Fire the state-change hook from a single place so peer-initiated
+		   disconnects (which arrive here via disconnectionCompleteHandler)
+		   are observable to the application as well. */
+		if c.connmgr.config.HookConnectionStateChange != nil {
+			c.connmgr.config.HookConnectionStateChange(c, false)
+		}
 
 		go func() {
 			if c.closeFunc != nil {
@@ -221,16 +265,33 @@ func (c *ConnectionManager) encryptionLELongTermKeyRequestHandler(event *hcieven
 		key, retVal = cb(conn, retVal)
 	}
 
+	handle := event.ConnectionHandle
+	var reply func() error
 	if len(key) == 16 {
 		in := hcicommands.LELongTermKeyRequestReplyInput{
-			ConnectionHandle: event.ConnectionHandle,
+			ConnectionHandle: handle,
 		}
 		copy(in.LongTermKey[:], key)
-		go c.Cmds.LELongTermKeyRequestReplySync(in, nil)
+		reply = func() error {
+			_, err := c.Cmds.LELongTermKeyRequestReplySync(in, nil)
+			return err
+		}
 	} else {
-		go c.Cmds.LELongTermKeyRequestNegativeReplySync(hcicommands.LELongTermKeyRequestNegativeReplyInput{
-			ConnectionHandle: event.ConnectionHandle,
-		}, nil)
+		reply = func() error {
+			_, err := c.Cmds.LELongTermKeyRequestNegativeReplySync(
+				hcicommands.LELongTermKeyRequestNegativeReplyInput{ConnectionHandle: handle}, nil)
+			return err
+		}
+	}
+
+	/* Bounded enqueue. The reply worker drains replyCh; if the queue
+	   is full, drop the request — the controller will time out the
+	   LL_ENC_REQ and the link will fail naturally. Better than
+	   spawning unbounded goroutines under peer flood. */
+	select {
+	case c.replyCh <- reply:
+	default:
+		c.logger.WithField("0handle", handle).Warn("ConnectionManager reply queue full; dropping LTK reply (peer is flooding?)")
 	}
 
 	return retVal
@@ -238,8 +299,12 @@ func (c *ConnectionManager) encryptionLELongTermKeyRequestHandler(event *hcieven
 
 func (c *ConnectionManager) ConnectionNew(handle uint16, closeFunc func() error) *Connection {
 	c.Lock()
-	_, ok := c.connections[handle]
-	bleutil.Assert(!ok, "Connection handle already exists")
+	if existing, ok := c.connections[handle]; ok {
+		c.logger.WithField("0handle", handle).Warn("Connection handle already exists; tearing down stale entry before reusing")
+		c.Unlock()
+		existing.disconnected()
+		c.Lock()
+	}
 
 	conn := &Connection{
 		connmgr:       c,
@@ -255,7 +320,7 @@ func (c *ConnectionManager) ConnectionNew(handle uint16, closeFunc func() error)
 	}
 
 	now := time.Now()
-	if now.Before(c.txNewConnBlockTime) {
+	if conn.txSlotManager != nil && now.Before(c.txNewConnBlockTime) {
 		conn.txLockout = true
 		go func(delay time.Duration) {
 			time.Sleep(delay)
@@ -316,10 +381,22 @@ func (c *Connection) ReadBuffer(ctx context.Context) (*pdu.PDU, error) {
 }
 
 func (c *Connection) WriteBuffer(buf *pdu.PDU) error {
-	if !c.IsOpen() {
+	/* Hold the txOutstandingMutex across the open-check + encode so a
+	   concurrent disconnected() either has already drained txFIFO (and
+	   we observe txOutstandingFlush=true) or runs strictly after the
+	   push completes. */
+	c.txOutstandingMutex.Lock()
+	if !c.IsOpen() || c.txOutstandingFlush {
+		c.txOutstandingMutex.Unlock()
 		bleutil.ReleaseBuffer(buf)
 		return ErrorConnectionClosed
 	}
+	if c.txSlotManager == nil {
+		c.txOutstandingMutex.Unlock()
+		bleutil.ReleaseBuffer(buf)
+		return ErrorNoTXSlotManager
+	}
+	c.txOutstandingMutex.Unlock()
 
 	//TODO: Check what type of encoder to use if we support more than ACL
 	c.encodeACL(buf)
@@ -354,9 +431,14 @@ func (c *Connection) ReadFrom(buf []byte) (int, net.Addr, error) {
 		return 0, nil, nil
 	}
 
+	/* Snapshot the context under the lock then release before blocking
+	   in ReadBuffer; otherwise a concurrent SetReadDeadline (which also
+	   wants this mutex) cannot interrupt the blocked read, breaking the
+	   net.Conn contract. */
 	c.rxContextMutex.Lock()
-	rx, err := c.ReadBuffer(c.rxContext)
+	ctx := c.rxContext
 	c.rxContextMutex.Unlock()
+	rx, err := c.ReadBuffer(ctx)
 
 	if err != nil {
 		return 0, nil, err

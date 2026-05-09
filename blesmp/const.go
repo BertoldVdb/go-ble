@@ -25,12 +25,18 @@ const (
 type smpFailedReason byte
 
 const (
-	failedPasskeyEntryFailed  smpFailedReason = 0x01
-	failedConfirmValueFailed  smpFailedReason = 0x4
-	failedPairingNotSupported smpFailedReason = 0x5
-	failedEncryptionKeySize   smpFailedReason = 0x6
-	failedCommandNotSupported smpFailedReason = 0x7
-	failedUnspecifiedReason   smpFailedReason = 0x8
+	failedPasskeyEntryFailed         smpFailedReason = 0x01
+	failedOOBNotAvailable            smpFailedReason = 0x02
+	failedAuthenticationRequirements smpFailedReason = 0x03
+	failedConfirmValueFailed         smpFailedReason = 0x04
+	failedPairingNotSupported        smpFailedReason = 0x05
+	failedEncryptionKeySize          smpFailedReason = 0x06
+	failedCommandNotSupported        smpFailedReason = 0x07
+	failedUnspecifiedReason          smpFailedReason = 0x08
+	failedRepeatedAttempts           smpFailedReason = 0x09
+	failedInvalidParameters          smpFailedReason = 0x0A
+	failedDHKeyCheckFailed           smpFailedReason = 0x0B
+	failedNumericComparisonFailed    smpFailedReason = 0x0C
 )
 
 type SMPState int

@@ -27,6 +27,10 @@ type HCISerial struct {
 
 	port      io.ReadWriteCloser
 	rxHandler hciinterface.HCIRxHandler
+
+	closeOnce sync.Once
+	closeErr  error
+	closed    bool
 }
 
 // ListDevices returns an array of strings containing all found devices.
@@ -79,7 +83,7 @@ func getHCIPacketLength(buffer []byte) int {
 		}
 	case hciconst.MsgTypeACL:
 		if len(buffer) >= 5 {
-			return 5 + int(buffer[3]) | (int(buffer[4]) << 8)
+			return 5 + (int(buffer[3]) | (int(buffer[4]) << 8))
 		}
 	case hciconst.MsgTypeEvent:
 		if len(buffer) >= 3 {
@@ -87,7 +91,7 @@ func getHCIPacketLength(buffer []byte) int {
 		}
 	case hciconst.MsgTypeISO:
 		if len(buffer) >= 5 {
-			return 5 + int(buffer[3]) | (int(buffer[4]&0xF3) << 8)
+			return 5 + (int(buffer[3]) | (int(buffer[4]&0x3F) << 8))
 		}
 	default:
 		return -1
@@ -128,12 +132,15 @@ func (d *HCISerial) Run() error {
 				rxHandler := d.rxHandler
 				d.Unlock()
 				if rxHandler != nil {
-					rxHandler(hciinterface.HCIRxPacket{
+					err = rxHandler(hciinterface.HCIRxPacket{
 						Received:         true,
 						Data:             workBuf[:pktLen],
 						RxTime:           time.Now(),
 						TimeFromHardware: false,
 					})
+					if err != nil {
+						return err
+					}
 				}
 
 				readIndex += pktLen
@@ -152,11 +159,23 @@ func (d *HCISerial) Run() error {
 // Close closes the the interface. It can be called at any time and multiple times as well.
 // It will terminate Run, if it was running.
 func (d *HCISerial) Close() error {
-	return d.port.Close()
+	d.closeOnce.Do(func() {
+		d.Lock()
+		d.closed = true
+		d.Unlock()
+		d.closeErr = d.port.Close()
+	})
+	return d.closeErr
 }
 
 // SendPacket sends a HCI packet to the device.
 func (d *HCISerial) SendPacket(pkt hciinterface.HCITxPacket) error {
+	d.Lock()
+	if d.closed {
+		d.Unlock()
+		return io.ErrClosedPipe
+	}
+	d.Unlock()
 	_, err := d.port.Write(pkt.Data)
 	return err
 }

@@ -212,12 +212,14 @@ func (p *CentralHelper) handleConn(conn *bleconnecter.BLEConnection, peer *Peer,
 
 	dev := bleatt.NewGattDeviceWithConn(conn, attstructure.NewStructure(), p.config.GATTConfig)
 
+	var smpConn *blesmp.SMPConn
 	l2 := blel2cap.New(conn, p.config.L2CAPConfig, func(psm blel2cap.PSMType, accept blel2cap.L2CAPConnAccepter) {
 		switch psm {
 		case blel2cap.PSMTypeATT:
-			dev.AddConn(accept())
+			dev.AddConnWithSMP(accept(), smpConn)
 		case blel2cap.PSMTypeSecurityManager:
-			dev.SetSMP(p.stack.SMP.AddConn(accept(), p.config.SMPConnConfig))
+			smpConn = p.stack.SMP.AddConn(accept(), p.config.SMPConnConfig)
+			dev.SetSMP(smpConn)
 		}
 	})
 

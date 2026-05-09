@@ -2,7 +2,6 @@ package hcicmdmgr
 
 import (
 	"context"
-	"time"
 
 	hciconst "github.com/BertoldVdb/go-ble/hci/const"
 )
@@ -30,7 +29,10 @@ func (s *commandQueue) commandRunGetToken(cmd HCICommand, sync bool, cb CommandC
 }
 
 func (s *commandQueue) commandRunPutToken(token *commandToken) ([]byte, error) {
-	token.timeoutTime = time.Now().Add(5 * time.Second)
+	/* timeoutTime is armed by the Worker once the token is actually
+	   issued to the controller. Arming it here would let a backlogged
+	   queue burn the 5-second budget before the command leaves the
+	   host, then take down the whole worker on a phantom timeout. */
 	token.data[3] = byte(len(token.data) - 4)
 
 	err := s.commandQueue.CommitToken(token)

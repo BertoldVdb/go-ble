@@ -24,7 +24,7 @@ type BLEAdvertiser struct {
 	legacyAdvertisingScanData   []byte
 	legacyAdvertisingUpdateChan chan (int)
 
-	legacyAdvertisingSlots    []LegacyAdvertisingSlot
+	legacyAdvertisingSlots    []*LegacyAdvertisingSlot
 	legacyAdvertisingBaseSlot *LegacyAdvertisingSlot
 }
 
@@ -48,6 +48,9 @@ func DefaultConfig() *BLEAdvertiserConfig {
 }
 
 func New(logger *logrus.Entry, ctrl *hci.Controller, config *BLEAdvertiserConfig) *BLEAdvertiser {
+	if config == nil {
+		config = DefaultConfig()
+	}
 	a := &BLEAdvertiser{
 		logger: logger,
 		ctrl:   ctrl,

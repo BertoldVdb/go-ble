@@ -17,6 +17,13 @@ import (
 
 type ConnectionManagerConfig struct {
 	HookConnectionStateChange func(c *Connection, open bool)
+
+	// DisconnectTimeout bounds how long Connection.Close blocks waiting
+	// for the controller's Disconnection-Complete event. Zero means use
+	// the default (5 seconds). After the timeout elapses the host
+	// completes a synthetic local teardown so shutdown isn't held up by
+	// an unresponsive controller.
+	DisconnectTimeout time.Duration
 }
 
 type ConnectionMangerEventsSMP struct {
@@ -52,15 +59,25 @@ type ConnectionManager struct {
 	useBroadcomQuirk bool
 
 	cb ConnectionMangerEventsSMP
+
+	/* Bounded queue for HCI replies issued in response to peer events
+	   (LTK requests, etc). The reply worker drains this serially in
+	   Run(); handlers that need to send a sync command back to the
+	   controller post a closure here instead of spawning an unbounded
+	   `go func()`. */
+	replyCh chan func() error
 }
 
 var (
 	ErrorClosed           = errors.New("Connection manager is closed")
 	ErrorConnectionClosed = errors.New("The connection is not open")
+	ErrorNoTXSlotManager  = errors.New("No TX slot manager is available")
 )
 
 func DefaultConfig() *ConnectionManagerConfig {
-	return &ConnectionManagerConfig{}
+	return &ConnectionManagerConfig{
+		DisconnectTimeout: 5 * time.Second,
+	}
 }
 
 func New(logger *logrus.Entry, cmds *hcicommands.Commands, events *hcievents.EventHandler, config *ConnectionManagerConfig, info *deviceinfo.ControllerInfo, sendFunc func(data []byte) error) *ConnectionManager {
@@ -74,6 +91,7 @@ func New(logger *logrus.Entry, cmds *hcicommands.Commands, events *hcievents.Eve
 		info:     info,
 
 		connections: make(map[uint16]*Connection),
+		replyCh:     make(chan func() error, 16),
 	}
 }
 
@@ -150,6 +168,25 @@ func (c *ConnectionManager) Run(readyCb func()) error {
 		c.logger.Warn("Detected Broadcom chip: using TX quirk.")
 		c.useBroadcomQuirk = true
 	}
+
+	/* Reply worker — drains the bounded queue used by event handlers
+	   to issue sync HCI replies (LTK request, etc) without spawning
+	   unbounded goroutines. */
+	replyDone := make(chan struct{})
+	go func() {
+		defer close(replyDone)
+		for {
+			select {
+			case <-c.closeflag.Chan():
+				return
+			case fn := <-c.replyCh:
+				if err := fn(); err != nil {
+					c.logger.WithError(err).Debug("ConnectionManager reply HCI command failed")
+				}
+			}
+		}
+	}()
+	defer func() { <-replyDone }()
 
 	err = c.runSlotManagers(readyCb)
 	if err != nil {

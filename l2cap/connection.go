@@ -49,6 +49,16 @@ func (c *L2Connection) Close() error {
 	if err == nil {
 		c.l.unregisterCID(c.localCID)
 
+		/* Drain any RX buffers still queued for this channel — without
+		   this they would not return to the global buffer freelist. */
+		for {
+			buf := c.rxBuffer.Pop()
+			if buf == nil {
+				break
+			}
+			bleutil.ReleaseBuffer(buf)
+		}
+
 		if c.canClose {
 			var result [2]uint16
 			_, _, err = c.l.SendCommandUint16(context.Background(), SigDisconnectionReq, result[:], c.remoteCID, c.localCID)
@@ -114,6 +124,12 @@ func (c *L2Connection) ParentConn() hciconnmgr.BufferConn {
 func (c *L2Connection) connectionRxHandler(cid uint16, buf *pdu.PDU) (error, bool) {
 	if buf == nil {
 		return c.Close(), false
+	}
+	/* If the channel was already closed, return the buffer immediately
+	   instead of pinning it in rxBuffer where no one will read it. */
+	if !c.IsOpen() {
+		bleutil.ReleaseBuffer(buf)
+		return ErrorL2ChannelClosed, false
 	}
 	c.rxBuffer.Push(buf)
 

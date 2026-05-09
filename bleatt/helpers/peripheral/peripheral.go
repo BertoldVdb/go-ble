@@ -8,6 +8,7 @@ import (
 	"github.com/BertoldVdb/go-ble/bleatt"
 	attstructure "github.com/BertoldVdb/go-ble/bleatt/structure"
 	"github.com/BertoldVdb/go-ble/bleconnecter"
+	"github.com/BertoldVdb/go-ble/blesmp"
 	hciconnmgr "github.com/BertoldVdb/go-ble/hci/connmgr"
 	blel2cap "github.com/BertoldVdb/go-ble/l2cap"
 	bleutil "github.com/BertoldVdb/go-ble/util"
@@ -67,20 +68,29 @@ func (p *PeripheralHelper) handleConn(conn hciconnmgr.BufferConn, remoteAddr net
 
 	var err error
 
+	/* Stop on the first failure and only call Disconnected on impls
+	   that successfully connected. The previous code overwrote `err` on
+	   each iteration and called Disconnected on every impl, which could
+	   crash impls that rely on Connected having succeeded. */
+	connected := 0
 	for _, m := range impl {
 		err = m.Connected(conn)
 		if err != nil {
 			cf.Close()
+			break
 		}
+		connected++
 	}
 
 	if err == nil {
+		var smpConn *blesmp.SMPConn
 		l2 := blel2cap.New(conn, nil, func(psm blel2cap.PSMType, accept blel2cap.L2CAPConnAccepter) {
 			switch psm {
 			case blel2cap.PSMTypeATT:
-				dev.AddConn(accept())
+				dev.AddConnWithSMP(accept(), smpConn)
 			case blel2cap.PSMTypeSecurityManager:
-				dev.SetSMP(p.stack.SMP.AddConn(accept(), nil))
+				smpConn = p.stack.SMP.AddConn(accept(), nil)
+				dev.SetSMP(smpConn)
 			}
 		})
 		go func() {
@@ -94,8 +104,8 @@ func (p *PeripheralHelper) handleConn(conn hciconnmgr.BufferConn, remoteAddr net
 	case <-p.ctx.Done():
 	}
 
-	for _, m := range impl {
-		m.Disconnected()
+	for i := 0; i < connected; i++ {
+		impl[i].Disconnected()
 	}
 
 	return err

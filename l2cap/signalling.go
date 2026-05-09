@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"sync"
 
 	"github.com/BertoldVdb/go-ble/bleconnecter"
 	bleutil "github.com/BertoldVdb/go-ble/util"
@@ -15,23 +16,55 @@ import (
 type signalling struct {
 	l *L2CAP
 
-	paramBuf []uint16
-
-	cmdQueue    *tokenqueue.Queue
+	/* mu serialises access to activeToken, currentOutgoing and paramBuf.
+	   These were previously touched from the rx, tx-token and timeout
+	   paths under an undocumented "single-goroutine" invariant — the
+	   mutex makes the coupling explicit and survives future refactors. */
+	mu          sync.Mutex
+	paramBuf    []uint16
 	activeToken *signallingCommandToken
+
+	cmdQueue *tokenqueue.Queue
 
 	currentOutgoing uint8
 }
 
 type signallingCommandToken struct {
-	ctx          context.Context
-	cid          uint16
-	code         uint8
-	payload      *pdu.PDU
-	completeChan chan (struct{})
+	ctx     context.Context
+	cid     uint16
+	code    uint8
+	payload *pdu.PDU
+
+	/* completeChan delivers completion to the waiter. The closed flag
+	   is set under the same mutex that gates sends, so a racing
+	   signalComplete cannot panic on send-after-close. */
+	completeChan chan struct{}
+	closeMu      sync.Mutex
+	closed       bool
 }
 
+// signalComplete delivers a non-blocking wake-up to the waiter. Safe to
+// call any number of times, before or after Cleanup, from any goroutine.
+func (sc *signallingCommandToken) signalComplete() {
+	sc.closeMu.Lock()
+	defer sc.closeMu.Unlock()
+	if sc.closed {
+		return
+	}
+	select {
+	case sc.completeChan <- struct{}{}:
+	default:
+	}
+}
+
+// Cleanup is idempotent and serialises with signalComplete via closeMu.
 func (sc *signallingCommandToken) Cleanup() {
+	sc.closeMu.Lock()
+	defer sc.closeMu.Unlock()
+	if sc.closed {
+		return
+	}
+	sc.closed = true
 	close(sc.completeChan)
 }
 
@@ -95,18 +128,22 @@ func (s *signalling) signallingProcess(cid uint16, code uint8, id uint8, payload
 	isUint16Cmd := code != SigEchoReq
 
 	if isResponse {
+		s.mu.Lock()
 		if id == s.currentOutgoing && s.activeToken != nil {
 			s.currentOutgoing++
 			if s.currentOutgoing == 0 {
 				s.currentOutgoing = 1
 			}
 
-			s.activeToken.code = code
-			s.activeToken.payload = payload
-			s.activeToken.completeChan <- struct{}{}
+			tok := s.activeToken
+			tok.code = code
+			tok.payload = payload
 			s.activeToken = nil
+			s.mu.Unlock()
+			tok.signalComplete()
 			return nil, true
 		}
+		s.mu.Unlock()
 		return nil, false
 	} else {
 		if s.l.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
@@ -118,25 +155,32 @@ func (s *signalling) signallingProcess(cid uint16, code uint8, id uint8, payload
 			}).Debug("Received L2CAP command")
 		}
 
+		var params []uint16
 		if isUint16Cmd {
+			s.mu.Lock()
 			s.paramBuf = s.paramBuf[:0]
 			for payload.Len() >= 2 {
 				s.paramBuf = append(s.paramBuf, binary.LittleEndian.Uint16(payload.DropLeft(2)))
 			}
-			if payload.Len() != 0 {
+			leftover := payload.Len() != 0
+			/* Copy out for use outside the lock; paramBuf is reused
+			   across calls so we mustn't keep the alias. */
+			params = append([]uint16(nil), s.paramBuf...)
+			s.mu.Unlock()
+			if leftover {
 				return nil, false
 			}
 		}
 
 		switch code {
 		case SigConnectionReq:
-			if len(s.paramBuf) == 2 {
+			if len(params) == 2 {
 				/* This is only for EDR */
-				return s.signallingCommandUint16(payload, cid, id, SigConnectionRsp, 0, s.paramBuf[1], 4, 0)
+				return s.signallingCommandUint16(payload, cid, id, SigConnectionRsp, 0, params[1], 4, 0)
 			}
 
 		case SigConfigurationReq:
-			if len(s.paramBuf) >= 2 {
+			if len(params) >= 2 {
 				return s.signallingCommandUint16(payload, cid, id, SigConfigurationRsp, 0, 0, 2)
 			}
 
@@ -148,14 +192,14 @@ func (s *signalling) signallingProcess(cid uint16, code uint8, id uint8, payload
 
 		case SigConnectionParametereUpdateReq:
 			conn, ok := s.l.conn.(*bleconnecter.BLEConnection)
-			if ok && len(s.paramBuf) == 4 {
+			if ok && len(params) == 4 {
 				var result error
-				if s.l.config == nil || s.l.config.BLEUpdateParametersVerify == nil || s.l.config.BLEUpdateParametersVerify(conn, s.paramBuf[0], s.paramBuf[1], s.paramBuf[2], s.paramBuf[3]) {
+				if s.l.config == nil || s.l.config.BLEUpdateParametersVerify == nil || s.l.config.BLEUpdateParametersVerify(conn, params[0], params[1], params[2], params[3]) {
 					result = conn.UpdateParams(bleconnecter.BLEConnectionParametersRequested{
-						ConnectionIntervalMin: s.paramBuf[0],
-						ConnectionIntervalMax: s.paramBuf[1],
-						ConnectionLatency:     s.paramBuf[2],
-						SupervisionTimeout:    s.paramBuf[3],
+						ConnectionIntervalMin: params[0],
+						ConnectionIntervalMax: params[1],
+						ConnectionLatency:     params[2],
+						SupervisionTimeout:    params[3],
 					})
 				} else {
 					result = errors.New("rejected")
@@ -262,15 +306,19 @@ func (s *signalling) sendCommand(ctx context.Context, cid uint16, code uint8, pa
 func (s *signalling) handleTokenTx(t tokenqueue.Token) {
 	token := t.(*signallingCommandToken)
 	if token.payload != nil {
+		s.mu.Lock()
 		s.activeToken = token
-		s.signallingWriteResponse(token.cid, token.code, s.currentOutgoing, token.payload)
-
+		seqID := s.currentOutgoing
+		s.mu.Unlock()
+		s.signallingWriteResponse(token.cid, token.code, seqID, token.payload)
 	} else {
-		token.completeChan <- struct{}{}
+		token.signalComplete()
 	}
 }
 
 func (s *signalling) tokenTimeoutChan() <-chan (struct{}) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.activeToken != nil {
 		return s.activeToken.ctx.Done()
 	}
@@ -278,10 +326,13 @@ func (s *signalling) tokenTimeoutChan() <-chan (struct{}) {
 }
 
 func (s *signalling) failActiveToken() {
-	if s.activeToken != nil {
-		s.activeToken.payload = nil
-		s.activeToken.completeChan <- struct{}{}
-		s.activeToken = nil
+	s.mu.Lock()
+	tok := s.activeToken
+	s.activeToken = nil
+	s.mu.Unlock()
+	if tok != nil {
+		tok.payload = nil
+		tok.signalComplete()
 	}
 }
 

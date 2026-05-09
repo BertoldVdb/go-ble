@@ -34,26 +34,45 @@ func (c *BLEConnecter) leConnectionParameterRequestHandler(event *hcievents.LERe
 		}
 	}
 
+	handle := event.ConnectionHandle
+	var reply func() error
 	if reject {
-		c.logger.WithField("0handle", event.ConnectionHandle).Debug("Rejecting connection parameters update")
-		go c.ctrl.Cmds.LERemoteConnectionParameterRequestNegativeReplySync(
-			hcicommands.LERemoteConnectionParameterRequestNegativeReplyInput{
-				ConnectionHandle: event.ConnectionHandle,
-				Reason:           0x3b, /* Unacceptable Connection Parameters */
-			}, nil)
-		return event
+		c.logger.WithField("0handle", handle).Debug("Rejecting connection parameters update")
+		reply = func() error {
+			_, err := c.ctrl.Cmds.LERemoteConnectionParameterRequestNegativeReplySync(
+				hcicommands.LERemoteConnectionParameterRequestNegativeReplyInput{
+					ConnectionHandle: handle,
+					Reason:           0x3b, /* Unacceptable Connection Parameters */
+				}, nil)
+			return err
+		}
+	} else {
+		c.logger.WithField("0handle", handle).Debug("Accepting connection parameters update")
+		intervalMin := event.IntervalMin
+		intervalMax := event.IntervalMax
+		latency := event.Latency
+		timeout := event.Timeout
+		reply = func() error {
+			_, err := c.ctrl.Cmds.LERemoteConnectionParameterRequestReplySync(
+				hcicommands.LERemoteConnectionParameterRequestReplyInput{
+					ConnectionHandle: handle,
+					IntervalMin:      intervalMin,
+					IntervalMax:      intervalMax,
+					Latency:          latency,
+					Timeout:          timeout,
+				}, nil)
+			return err
+		}
 	}
 
-	c.logger.WithField("0handle", event.ConnectionHandle).Debug("Accepting connection parameters update")
-
-	go c.ctrl.Cmds.LERemoteConnectionParameterRequestReplySync(
-		hcicommands.LERemoteConnectionParameterRequestReplyInput{
-			ConnectionHandle: event.ConnectionHandle,
-			IntervalMin:      event.IntervalMin,
-			IntervalMax:      event.IntervalMax,
-			Latency:          event.Latency,
-			Timeout:          event.Timeout,
-		}, nil)
+	/* Bounded enqueue. A peer that floods param-update requests can
+	   make us drop replies, but cannot exhaust goroutines or queue
+	   memory. */
+	select {
+	case c.replyCh <- reply:
+	default:
+		c.logger.WithField("0handle", handle).Warn("Connecter reply queue full; dropping HCI reply (peer is flooding?)")
+	}
 	return event
 }
 

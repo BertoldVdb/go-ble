@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"time"
+	"unicode/utf8"
 
 	"github.com/BertoldVdb/go-ble/hci"
 	hcicommands "github.com/BertoldVdb/go-ble/hci/commands"
@@ -11,9 +12,23 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// truncateUTF8 returns the longest prefix of s that is at most maxBytes
+// bytes long and ends on a UTF-8 rune boundary.
+func truncateUTF8(s string, maxBytes int) string {
+	if len(s) <= maxBytes {
+		return s
+	}
+	cut := maxBytes
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut]
+}
+
 var (
-	ErrorClosed  = errors.New("Advertiser is closed")
-	ErrorExpired = errors.New("Dataset is not current, cannot apply unless forced")
+	ErrorClosed         = errors.New("Advertiser is closed")
+	ErrorExpired        = errors.New("Dataset is not current, cannot apply unless forced")
+	ErrorPayloadTooLong = errors.New("Advertising payload exceeds the 31-byte legacy AD limit")
 )
 
 type LegacyAdvertisingData struct {
@@ -90,7 +105,9 @@ func (a *BLEAdvertiser) legacyAdvertisingConfigure(data *LegacyAdvertisingData) 
 	var buffer [31]byte
 
 	if !bytes.Equal(data.BeaconPacket, a.legacyAdvertisingData) {
-		bleutil.Assert(len(data.BeaconPacket) <= 31, "Base advertising data is too long")
+		if len(data.BeaconPacket) > 31 {
+			return ErrorPayloadTooLong
+		}
 
 		a.legacyAdvertisingData = a.legacyAdvertisingData[:len(data.BeaconPacket)]
 		copy(a.legacyAdvertisingData, data.BeaconPacket)
@@ -106,7 +123,9 @@ func (a *BLEAdvertiser) legacyAdvertisingConfigure(data *LegacyAdvertisingData) 
 	}
 
 	if !bytes.Equal(data.ScanPacket, a.legacyAdvertisingScanData) {
-		bleutil.Assert(len(data.ScanPacket) <= 31, "Scan response advertising data is too long")
+		if len(data.ScanPacket) > 31 {
+			return ErrorPayloadTooLong
+		}
 
 		a.legacyAdvertisingScanData = a.legacyAdvertisingScanData[:len(data.ScanPacket)]
 		copy(a.legacyAdvertisingScanData, data.ScanPacket)
@@ -151,10 +170,14 @@ func (a *BLEAdvertiser) LegacyAdvertisingSetConnection(useAllowlist bool, peerAd
 	}
 
 	cancelFunc := func() error {
+		/* Revert to passive (scan-indication) advertising. Mutate `newData`
+		   (which is the version returned by the previous ReplaceData) and
+		   apply that — applying `data` would re-assert the connectable
+		   state we are trying to clear. */
 		newData.Active = a.legacyAdvertisingAlwaysOn
 		newData.Type = LegacyAdvertisementTypeScanInd
-		_, _ = a.legacyAdvertisingBaseSlot.ReplaceData(false, data)
-		return nil
+		_, err := a.legacyAdvertisingBaseSlot.ReplaceData(true, newData)
+		return err
 	}
 
 	return cancelFunc, nil
@@ -211,23 +234,26 @@ func (a *BLEAdvertiser) LegacyAdvertisingGetSlot() *LegacyAdvertisingSlot {
 	a.legacyAdvertisingMutex.Lock()
 	defer a.legacyAdvertisingMutex.Unlock()
 
-	new := LegacyAdvertisingSlot{
-		parent: a,
-		valid:  true,
-	}
-
+	/* Slots are stored by pointer so that subsequent appends never invalidate
+	   pointers that earlier callers have already received. Returning a pointer
+	   into the slice's backing array (the previous design) was unsafe — once
+	   `append` reallocated, every prior caller's pointer became stale. */
 	for i, m := range a.legacyAdvertisingSlots {
 		if !m.valid {
-			new.index = i
-			a.legacyAdvertisingSlots[i] = new
-			return &a.legacyAdvertisingSlots[new.index]
+			m.index = i
+			m.valid = true
+			return m
 		}
 	}
 
-	new.index = len(a.legacyAdvertisingSlots)
-	a.legacyAdvertisingSlots = append(a.legacyAdvertisingSlots, new)
+	slot := &LegacyAdvertisingSlot{
+		parent: a,
+		valid:  true,
+		index:  len(a.legacyAdvertisingSlots),
+	}
+	a.legacyAdvertisingSlots = append(a.legacyAdvertisingSlots, slot)
 
-	return &a.legacyAdvertisingSlots[new.index]
+	return slot
 }
 
 func (a *BLEAdvertiser) legacyAdvertisingInit() {
@@ -258,11 +284,11 @@ func (a *BLEAdvertiser) legacyAdvertisingInit() {
 			beaconData.BeaconPacket = UtilPDUAddRecord(beaconData.BeaconPacket, serviceType, service)
 		}
 
-		nameType := uint8(9)
+		nameType := uint8(9) // Complete Local Name
 		nameDev := a.config.DeviceName
-		if len(a.config.DeviceName) > 27 {
-			nameType = 8
-			nameDev = nameDev[0:27]
+		if len(nameDev) > 27 {
+			nameType = 8 // Shortened Local Name
+			nameDev = truncateUTF8(nameDev, 27)
 		}
 		beaconData.ScanPacket = UtilPDUAddRecord(beaconData.ScanPacket, nameType, []byte(nameDev))
 
@@ -309,7 +335,7 @@ func (a *BLEAdvertiser) legacyAdvertisingManager() error {
 			slot := a.legacyAdvertisingSlots[index]
 
 			if slot.valid && slot.data.Active {
-				return a.legacyAdvertisingConfigure(&a.legacyAdvertisingSlots[index].data)
+				return a.legacyAdvertisingConfigure(&slot.data)
 			}
 		}
 

@@ -44,8 +44,14 @@ type gattDeviceConn struct {
 	conn   hciconnmgr.BufferConn
 	logger *logrus.Entry
 
+	ctx    context.Context
+	cancel context.CancelFunc
+
 	mtuRequest sync.Once
 	mtu        uint32
+
+	smpConn    *blesmp.SMPConn
+	writeQueue []attServerWriteQueueEntry
 
 	client attClient
 }
@@ -86,7 +92,7 @@ func NewGattDevice(externalStructure *attstructure.Structure, config *GattDevice
 
 	dev := &GattDevice{
 		conns:            make(map[hciconnmgr.BufferConn](*gattDeviceConn)),
-		ourMTU:           0xFFFF,
+		ourMTU:           normalizeATTMTU(config.MTU),
 		config:           config,
 		initialConnValid: make(chan (struct{})),
 	}
@@ -118,10 +124,16 @@ func (d *GattDevice) SetSMP(smp *blesmp.SMPConn) {
 	d.connsMutex.Lock()
 	defer d.connsMutex.Unlock()
 
-	if len(d.conns) != 0 {
-		panic("SetSMP called after connections were added")
+	for _, conn := range d.conns {
+		if conn.smpConn == nil {
+			conn.smpConn = smp
+		}
 	}
 	d.smpConn = smp
+}
+
+func (d *GattDevice) AddConnWithSMP(conn hciconnmgr.BufferConn, smp *blesmp.SMPConn) error {
+	return d.addConnInternal(conn, smp)
 }
 
 func (d *gattDeviceConn) handlePDU(buf *pdu.PDU) (bool, error) {
@@ -184,10 +196,9 @@ func (d *gattDeviceConn) handleConn() error {
 
 func (g *GattDevice) CloseConn(conn hciconnmgr.BufferConn) error {
 	g.connsMutex.Lock()
-	defer g.connsMutex.Unlock()
-
-	_, ok := g.conns[conn]
+	d, ok := g.conns[conn]
 	if !ok {
+		g.connsMutex.Unlock()
 		return errors.New("Connection not found")
 	}
 
@@ -196,17 +207,58 @@ func (g *GattDevice) CloseConn(conn hciconnmgr.BufferConn) error {
 		g.config.ConnCb(len(g.conns))
 	}
 
+	/* If we just closed the connection that ClientRead/ClientWrite
+	   were pinned to, demote it. The next AddConn will re-establish
+	   initialConn and re-arm initialConnValid; if there is another
+	   live connection, promote it instead so existing client calls
+	   keep working. Earlier code never cleared initialConn, so after
+	   a reconnect ClientRead/ClientWrite kept using the dead
+	   connection's handlers. */
+	if g.initialConn == d {
+		g.initialConn = nil
+		g.initialConnValid = make(chan struct{})
+
+		// Promote any other live conn to initialConn so client calls
+		// can resume without waiting for AddConn.
+		for _, other := range g.conns {
+			g.initialConn = other
+			close(g.initialConnValid)
+			break
+		}
+
+		// Clear the discoveryOnce so a fresh discovery will run on
+		// the next initialConn (if discovery is configured to auto-run).
+		g.clientDiscoveryOnce.Reset()
+		g.clientStructure = nil
+	}
+	g.connsMutex.Unlock()
+
+	/* Cancel any in-flight operations bound to this connection
+	   (e.g., the MTU exchange that uses ctx instead of context.Background). */
+	if d.cancel != nil {
+		d.cancel()
+	}
+
 	conn.UseDone()
 	return conn.Close()
 }
 
 func (g *GattDevice) AddConn(conn hciconnmgr.BufferConn) error {
+	return g.addConnInternal(conn, g.smpConn)
+}
+
+func (g *GattDevice) addConnInternal(conn hciconnmgr.BufferConn, smp *blesmp.SMPConn) error {
+	ctx, cancel := context.WithCancel(context.Background())
 	d := &gattDeviceConn{
 		parent: g,
 		conn:   conn,
 		logger: bleutil.LogWithPrefix(conn.GetLogger(), "att"),
 
-		mtu: 23,
+		ctx:    ctx,
+		cancel: cancel,
+
+		mtu:     23,
+		smpConn: smp,
 	}
 
 	conn.UseStart()
@@ -228,7 +280,16 @@ func (g *GattDevice) AddConn(conn hciconnmgr.BufferConn) error {
 	go d.handleConn()
 	go d.getMTUBlocking()
 	if initial && d.parent.config.DiscoverRemoteOnConnect {
-		go g.clientDiscoveryOnce.Trigger()
+		/* Use Wait rather than Trigger here: Trigger races with a
+		   concurrent ClientGetStructure(ctx)→Wait(ctx) call. The Once
+		   library's Wait doesn't actually wait when it observes a
+		   parallel Trigger in progress (waitChan is nil, triggerInternal
+		   returns early because running=true, Wait falls through and
+		   returns nil prematurely with the handler still running).
+		   Driving the work via Wait — even if no one is watching —
+		   avoids that race because Wait properly sets up the waitChan
+		   and follow-on Wait callers will block on it. */
+		go func() { _ = g.clientDiscoveryOnce.Wait(context.Background()) }()
 	}
 
 	return nil
@@ -239,7 +300,9 @@ func (d *gattDeviceConn) getMTUBlocking() int {
 		buf := bleutil.GetBuffer(3)
 		buf.Buf()[0] = byte(ATTExchangeMTUReq)
 		binary.LittleEndian.PutUint16(buf.Buf()[1:], d.parent.ourMTU)
-		cmd, response, err := d.client.sendCommand(context.Background(), buf, true)
+		/* Use the connection-lifetime context so an unresponsive peer
+		   does not pin this goroutine on context.Background() forever. */
+		cmd, response, err := d.client.sendCommand(d.ctx, buf, true)
 		defer bleutil.ReleaseBuffer(response)
 
 		if err == nil && cmd == ATTExchangeMTURsp && response.Len() == 2 {
@@ -259,16 +322,23 @@ func (d *gattDeviceConn) getMTU() int {
 }
 
 func (d *gattDeviceConn) setMTU(new uint16) int {
-	new32 := uint32(new)
-	mtu := atomic.LoadUint32(&d.mtu)
-
-	if new32 > mtu {
-		d.logger.WithField("0old", mtu).WithField("1new", new).Debug("Update MTU")
-		mtu = new32
+	new32 := uint32(normalizeATTMTU(new))
+	if new32 > uint32(d.parent.ourMTU) {
+		new32 = uint32(d.parent.ourMTU)
 	}
-
-	atomic.StoreUint32(&d.mtu, new32)
-	return int(new32)
+	/* The negotiated ATT MTU is monotonic by spec — it can only grow.
+	   CAS in a loop so concurrent setMTU callers cannot shrink it below
+	   what's already been observed by readers. */
+	for {
+		old := atomic.LoadUint32(&d.mtu)
+		if new32 <= old {
+			return int(old)
+		}
+		if atomic.CompareAndSwapUint32(&d.mtu, old, new32) {
+			d.logger.WithField("0old", old).WithField("1new", new32).Debug("Update MTU")
+			return int(new32)
+		}
+	}
 }
 
 func (d *GattDevice) getConnWithHighestMTU() *gattDeviceConn {

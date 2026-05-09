@@ -13,8 +13,12 @@ func getOpcode(buf *pdu.PDU) (bool, ATTCommand, bool, bool) {
 
 	opcode := buf.Buf()[0]
 	isAuthenticated := (opcode >> 7) == 1
-	method := ATTCommand(opcode & 0x3F)
-	isForServer := opcode&1 == 0
+	method := ATTCommand(opcode)
+	if method != ATTWriteCMD && method != ATTSignedWriteCMD {
+		method = ATTCommand(opcode & 0x3F)
+	}
+
+	isForServer := method&1 == 0
 
 	if method == ATTHandleValueCNF {
 		isForServer = false

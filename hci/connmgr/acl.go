@@ -3,11 +3,16 @@ package hciconnmgr
 import (
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 
 	bleutil "github.com/BertoldVdb/go-ble/util"
 	pdu "github.com/BertoldVdb/go-misc/pdubuf"
 	"github.com/sirupsen/logrus"
 )
+
+const maxL2CAPFrameLength = 4 + 0xFFFF
+
+var errACLReassemblyTooLarge = errors.New("ACL reassembly buffer too large")
 
 func (c *ConnectionManager) handleACL(data []byte) bool {
 	if len(data) < 4 {
@@ -35,10 +40,12 @@ func (c *ConnectionManager) handleACL(data []byte) bool {
 		return true
 	}
 
-	/* Look up the connection */
+	/* Hold the RLock across the rxPDU work. disconnectionCompleteHandler
+	   takes the *write* lock before freeing rxPDU, so this prevents a
+	   use-after-free between the map lookup and the touch of conn.rxPDU. */
 	c.RLock()
+	defer c.RUnlock()
 	conn, ok := c.connections[handle]
-	c.RUnlock()
 
 	if c.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
 		c.logger.WithFields(logrus.Fields{
@@ -54,6 +61,16 @@ func (c *ConnectionManager) handleACL(data []byte) bool {
 		return true
 	}
 
+	reassembledLen := conn.rxPDU.Len() + len(payload)
+	if reassembledLen > maxL2CAPFrameLength {
+		conn.rxPDU.Reset()
+		conn.connmgr.logger.WithFields(logrus.Fields{
+			"0handle": conn.handle,
+			"1len":    reassembledLen,
+		}).Warn("Dropping oversized ACL reassembly")
+		return true
+	}
+
 	if flagPB == 2 {
 		/* New fragment, clear reassembly buffer */
 		conn.rxPDU.Reset()
@@ -63,7 +80,9 @@ func (c *ConnectionManager) handleACL(data []byte) bool {
 	conn.rxPDU.Append(payload...)
 
 	/* Complete L2CAP packet? */
-	conn.handleACLData()
+	if err := conn.handleACLData(); err != nil {
+		conn.connmgr.logger.WithError(err).WithField("0handle", conn.handle).Warn("Failed to handle ACL data")
+	}
 
 	return true
 }
@@ -75,6 +94,10 @@ func (c *Connection) handleACLData() error {
 		}
 
 		pktLen := int(binary.LittleEndian.Uint16(c.rxPDU.Buf()[0:2])) + 4
+		if pktLen > maxL2CAPFrameLength {
+			c.rxPDU.Reset()
+			return errACLReassemblyTooLarge
+		}
 		payload := c.rxPDU.DropLeft(pktLen)
 		if payload == nil {
 			break

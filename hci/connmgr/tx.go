@@ -31,7 +31,15 @@ func (s *txSlotManager) GetBufferLength() int {
 func (s *txSlotManager) ReleaseSlots(numSlots int) {
 	s.Lock()
 	s.availableSlots += numSlots
-	bleutil.Assert(s.availableSlots <= s.maxSlots, "Released so many slots there are now more available than the maximum")
+	if s.availableSlots > s.maxSlots {
+		s.connmgr.logger.WithFields(logrus.Fields{
+			"0channel":   s.channel,
+			"1available": s.availableSlots,
+			"2max":       s.maxSlots,
+			"3released":  numSlots,
+		}).Warn("Slot accounting overflow; controller released more slots than the configured maximum, clamping")
+		s.availableSlots = s.maxSlots
+	}
 
 	if s.connmgr.logger.Logger.IsLevelEnabled(logrus.TraceLevel) {
 		s.connmgr.logger.WithFields(logrus.Fields{
@@ -77,6 +85,16 @@ func (s *txSlotManager) WaitSlot() bool {
 func createSlotManager(c *ConnectionManager, channel string, slotBufferLength int, maxSlots int) *txSlotManager {
 	if maxSlots == 0 {
 		return nil
+	}
+	/* Reject pathological controllers that report a zero MTU; the TX
+	   fragmentation loop divides by this length and would otherwise spin
+	   forever pushing header-only fragments. 27 is the BLE LL minimum. */
+	if slotBufferLength < 27 {
+		c.logger.WithFields(logrus.Fields{
+			"0channel":          channel,
+			"1slotBufferLength": slotBufferLength,
+		}).Warn("Controller reported sub-minimum slot buffer length; clamping to 27")
+		slotBufferLength = 27
 	}
 
 	return &txSlotManager{
@@ -186,7 +204,7 @@ func (s *txSlotManager) txWorker() error {
 
 func quirkFixBroadcomCompleteEvent(event *hcievents.NumberOfCompletedPacketsEvent) {
 	elem := len(event.ConnectionHandle)
-	if elem%1 > 0 {
+	if elem%2 > 0 {
 		/* Uneven number of elements */
 		for i := 1; i < elem; i += 2 {
 			event.ConnectionHandle[i], event.NumCompletedPackets[i] = event.NumCompletedPackets[i], event.ConnectionHandle[i]
@@ -219,9 +237,15 @@ func (c *ConnectionManager) packetCompleteHandler(event *hcievents.NumberOfCompl
 			if conn.txLockout || conn.txOutstandingFlush {
 				del = 0
 			} else {
+				if del > conn.txOutstanding {
+					c.logger.WithFields(logrus.Fields{
+						"0handle":      conn.handle,
+						"1outstanding": conn.txOutstanding,
+						"2reported":    del,
+					}).Warn("Controller acked more packets than outstanding; clamping")
+					del = conn.txOutstanding
+				}
 				conn.txOutstanding -= del
-				//TODO: make non-fatal
-				bleutil.Assert(conn.txOutstanding >= 0, "Negative outstanding packets")
 			}
 
 			conn.txOutstandingMutex.Unlock()
@@ -271,6 +295,10 @@ func (c *ConnectionManager) runSlotManagers(readyCb func()) error {
 				c.txSlotManagerLEACL = createSlotManager(c, "LE/ACL", int(lbuf.LEACLDataPacketLength), int(lbuf.TotalNumLEACLDataPackets))
 			}
 		}
+	}
+
+	if c.txSlotManagerLEACL == nil {
+		return ErrorNoTXSlotManager
 	}
 
 	err = c.Events.SetNumberOfCompletedPacketsEventCallback(c.packetCompleteHandler)

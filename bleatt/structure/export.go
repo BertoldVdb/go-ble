@@ -71,12 +71,18 @@ func (result *ExportedStructure) Append(s *Structure) {
 			c.ValueHandle = charValue
 			result.Handles = append(result.Handles, charValue)
 
+			/* Derive CCC permissions from the characteristic's overall
+			   confidentiality model, not just its read encryption. A
+			   notify-only / write-encrypted characteristic is sensitive
+			   too — leaving the CCCD writable by anyone would let an
+			   unencrypted peer subscribe to its notification stream and
+			   read its current subscription state. */
 			var cccFlag CharacteristicFlag
-			if c.flags&CharacteristicReadNeedsEncryption > 0 {
-				cccFlag |= CharacteristicWriteNeedsEncryption
+			if c.flags&(CharacteristicReadNeedsEncryption|CharacteristicWriteNeedsEncryption) > 0 {
+				cccFlag |= CharacteristicReadNeedsEncryption | CharacteristicWriteNeedsEncryption
 			}
-			if c.flags&CharacteristicReadNeedsAuthentication > 0 {
-				cccFlag |= CharacteristicWriteNeedsAuthentication
+			if c.flags&(CharacteristicReadNeedsAuthentication|CharacteristicWriteNeedsAuthentication) > 0 {
+				cccFlag |= CharacteristicReadNeedsAuthentication | CharacteristicWriteNeedsAuthentication
 			}
 
 			/* Does it need a CCC? */

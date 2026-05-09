@@ -184,6 +184,11 @@ func (s *commandQueue) Worker() error {
 			debugMaxIssue := s.parent.commandMaxIssue
 			debugOpcode := workingToken.opcode
 
+			/* Arm the per-token timeout right before issuing it on the
+			   wire so a backlogged queue does not consume the budget
+			   before the command leaves the host. */
+			workingToken.timeoutTime = time.Now().Add(5 * time.Second)
+
 			/* It is guaranteed there will be at least one nil element */
 			for i := range s.commandActive {
 				if s.commandActive[i] == nil {

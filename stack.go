@@ -56,6 +56,32 @@ func New(logger *logrus.Entry, config *BluetoothStackConfig, dev hciinterface.HC
 		config = DefaultConfig()
 	}
 
+	/* Fill in any sub-configs the caller left as nil. Each component's
+	   constructor dereferences its config (HCI controller reads
+	   AwaitStartup at controller.go:90, scanner uses
+	   ScanCycleDurationMs at scanner.go:117, advertiser reads
+	   DeviceName at legacy.go:262, connecter reads
+	   BLEUpdateParametersVerify at params.go:31, SMP reads
+	   StoredKeysPath at smp.go:147). Without this defaulting, a
+	   caller passing a partially-populated BluetoothStackConfig
+	   nil-panicked deep inside a sub-component instead of getting a
+	   working stack. */
+	if config.HCIControllerConfig == nil {
+		config.HCIControllerConfig = hci.DefaultConfig()
+	}
+	if config.BLEScannerConfig == nil {
+		config.BLEScannerConfig = &blescanner.BLEScannerConfig{}
+	}
+	if config.BLEAdvertiserConfig == nil {
+		config.BLEAdvertiserConfig = bleadvertiser.DefaultConfig()
+	}
+	if config.BLEConnecterConfig == nil {
+		config.BLEConnecterConfig = &bleconnecter.BLEConnecterConfig{}
+	}
+	if config.SMPConfig == nil {
+		config.SMPConfig = blesmp.DefaultConfig()
+	}
+
 	s := &BluetoothStack{
 		config: config,
 		logger: logger,

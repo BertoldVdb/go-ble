@@ -95,6 +95,8 @@ func (d *BLEDevice) handleRecord(event EventType, record []byte) {
 }
 
 func (d *BLEDevice) GetGAPTypes(result []int) []int {
+	d.RLock()
+	defer d.RUnlock()
 	result = result[:0]
 
 	if d.gapFields != nil {
@@ -107,6 +109,8 @@ func (d *BLEDevice) GetGAPTypes(result []int) []int {
 }
 
 func (d *BLEDevice) GetGAPRecord(gapType int, buf *GAPRecord) *GAPRecord {
+	d.RLock()
+	defer d.RUnlock()
 	if d.gapFields == nil {
 		return nil
 	}
@@ -168,6 +172,8 @@ func (d *BLEDevice) handleName(gap *GAPRecord) {
 }
 
 func (d *BLEDevice) GetNameType() (string, int) {
+	d.RLock()
+	defer d.RUnlock()
 	return d.name, d.nameState
 }
 
@@ -177,6 +183,8 @@ func (d *BLEDevice) GetName() string {
 }
 
 func (dev *BLEDevice) GetAddr() bleutil.BLEAddr {
+	dev.RLock()
+	defer dev.RUnlock()
 	return dev.addr
 }
 
@@ -187,6 +195,8 @@ func (d *BLEDevice) handleFlags(gap *GAPRecord) {
 }
 
 func (d *BLEDevice) GetFlags() uint8 {
+	d.RLock()
+	defer d.RUnlock()
 	return d.flags
 }
 
@@ -197,6 +207,8 @@ func (d *BLEDevice) handleTXPower(gap *GAPRecord) {
 }
 
 func (d *BLEDevice) GetTXPower() int8 {
+	d.RLock()
+	defer d.RUnlock()
 	return d.txPower
 }
 
@@ -216,7 +228,12 @@ func (d *BLEDevice) handleUUID(gap *GAPRecord) {
 	case 2:
 		l = 16
 	default:
-		panic("Unsupported UUID type supplied")
+		/* Caller restricts gap.Type to 0x2..0x7, so this branch should be
+		   unreachable. Don't panic on network data — log and drop. */
+		if d.scanner.logger != nil {
+			d.scanner.logger.WithField("0type", gap.Type).Debug("Unsupported UUID list type")
+		}
+		return
 	}
 
 	if complete {
@@ -258,6 +275,8 @@ func (d *BLEDevice) handleUUID(gap *GAPRecord) {
 }
 
 func (d *BLEDevice) GetServices(serviceType int, in []bleutil.UUID) []bleutil.UUID {
+	d.RLock()
+	defer d.RUnlock()
 	in = in[:0]
 
 	if serviceType < 0 {

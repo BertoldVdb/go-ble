@@ -39,18 +39,21 @@ func (dev *BLEDevice) signalUpdatedCallbacks() {
 
 	if cb != nil {
 		cb(dev)
-	} else {
-		s := dev.scanner
-		s.Lock()
-		for i := 0; i < len(s.deviceUpdatedCallbacks); i++ {
-			cb = s.deviceUpdatedCallbacks[i]
-			s.Unlock()
-			if cb != nil {
-				cb(dev)
-			}
-			s.Lock()
+		return
+	}
+
+	/* Snapshot the global callback list so user callbacks may safely
+	   register/unregister callbacks (the previous index-based iteration
+	   could miss or repeat entries when the slice mutated under it). */
+	s := dev.scanner
+	s.Lock()
+	cbs := append([]registeredDeviceUpdateCB(nil), s.deviceUpdatedCallbacks...)
+	s.Unlock()
+
+	for _, e := range cbs {
+		if e.cb != nil {
+			e.cb(dev)
 		}
-		s.Unlock()
 	}
 }
 
@@ -74,13 +77,19 @@ func (s *BLEScanner) handleScanResult(ad *hcievents.LEAdvertisingReportEvent) *h
 
 		skip := false
 
+		/* Snapshot the callback list so callbacks can safely re-enter
+		   scanner methods (the previous design held s.Lock() across the
+		   callback call, which would deadlock if the user touched the
+		   scanner from inside the callback). */
 		s.Lock()
-		for _, m := range s.advertisingReportCallbacks {
-			if skip = m(&pkt); skip {
+		cbs := append([]registeredAdvReportCB(nil), s.advertisingReportCallbacks...)
+		s.Unlock()
+
+		for _, m := range cbs {
+			if skip = m.cb(&pkt); skip {
 				break
 			}
 		}
-		s.Unlock()
 		if skip {
 			continue
 		}
@@ -97,7 +106,6 @@ func (s *BLEScanner) handleScanResult(ad *hcievents.LEAdvertisingReportEvent) *h
 		}
 		dev.rssi = int8(ad.RSSI[i])
 		dev.handlePDU(event, ad.Data[i])
-		dev.signalUpdatedCallbacks()
 
 		if s.logger != nil {
 			if isNew {
@@ -115,6 +123,11 @@ func (s *BLEScanner) handleScanResult(ad *hcievents.LEAdvertisingReportEvent) *h
 		}
 
 		dev.Unlock()
+
+		/* Invoke user-update callbacks after the device write lock has
+		   been released; otherwise, callbacks that call self-locking
+		   getters on the same goroutine would deadlock. */
+		dev.signalUpdatedCallbacks()
 	}
 	return ad
 }

@@ -18,11 +18,32 @@ type attServerWriteQueueEntry struct {
 	payload []byte
 }
 
+const (
+	// maxFindByTypeValueLength caps the length of the value-to-match in
+	// ATTFindByTypeValueReq. The spec allows up to (MTU-7), but allowing
+	// the full MTU forces every probed handle through a bytes.Equal of
+	// peer-controlled bytes — large enough to amplify CPU on the server.
+	maxFindByTypeValueLength = 64
+
+	// maxPrepareWriteQueueBytes bounds the total bytes a single peer can
+	// have queued across all PrepareWrite fragments before commit.
+	maxPrepareWriteQueueBytes = 4096
+)
+
 type attServer struct {
 	parent *GattDevice
 
 	localStructure *attstructure.ExportedStructure
-	writeQueue     []attServerWriteQueueEntry
+}
+
+func normalizeATTMTU(mtu uint16) uint16 {
+	if mtu == 0 {
+		return 0xFFFF
+	}
+	if mtu < 23 {
+		return 23
+	}
+	return mtu
 }
 
 func (a *attServer) init(parent *GattDevice, localStructure *attstructure.ExportedStructure) error {
@@ -81,6 +102,9 @@ func (a *attServer) handleMTUReq(conn *gattDeviceConn, buf *pdu.PDU) (bool, erro
 func (a *attServer) addPayload(conn *gattDeviceConn, buf *pdu.PDU, payload []byte) (bool, int) {
 	mtu := conn.getMTU()
 	maxLen := mtu - buf.Len()
+	if maxLen <= 0 {
+		return true, 0
+	}
 	if len(payload) < maxLen {
 		maxLen = len(payload)
 	}
@@ -122,6 +146,13 @@ func (a *attServer) handleDiscovery(conn *gattDeviceConn, method ATTCommand, buf
 
 		uuid = bleutil.UUIDFromBytes(buf.Buf()[4:6])
 		checkValue = buf.Buf()[6:]
+		/* Cap the value-to-match length: the spec only requires up to
+		   the negotiated MTU but we don't actually serve attributes
+		   bigger than this and a peer could otherwise force a
+		   bytes.Equal scan over very large payloads. */
+		if len(checkValue) > maxFindByTypeValueLength {
+			return false, sendError(conn, method, startHandle, ATTErrorInvalidPDU)
+		}
 	}
 
 	buf.Reset()
@@ -143,10 +174,6 @@ func (a *attServer) handleDiscovery(conn *gattDeviceConn, method ATTCommand, buf
 		}
 
 		if method == ATTReadByGroupTypeReq && m.Info.GroupEndHandle == 0 {
-			continue
-		}
-
-		if checkValue != nil && !bytes.Equal(m.Value, checkValue) {
 			continue
 		}
 
@@ -175,11 +202,20 @@ func (a *attServer) handleDiscovery(conn *gattDeviceConn, method ATTCommand, buf
 			extra = 2 + 2
 		}
 
-		if addValue {
-			secErr := a.checkSecurity(true, m.Info.Flags)
+		/* The security check has to run on every method that touches m.Value.
+		   ATTFindByTypeValueReq does a bytes.Equal against the attribute value;
+		   without this check, an unencrypted peer could probe the contents of
+		   read-encryption-required attributes by guess-and-check. */
+		needSecCheck := addValue || (method == ATTFindByTypeValueReq)
+		if needSecCheck {
+			secErr := a.checkSecurity(conn, true, m.Info.Flags)
 			if secErr != ATTErrorNone {
 				return false, sendError(conn, method, m.Info.Handle, secErr)
 			}
+		}
+
+		if checkValue != nil && !bytes.Equal(m.Value, checkValue) {
+			continue
 		}
 
 		if !hasResults {
@@ -244,7 +280,7 @@ func (a *attServer) findHandle(handle uint16) *attstructure.GATTHandle {
 	return nil
 }
 
-func (a *attServer) checkSecurity(isRead bool, flags attstructure.CharacteristicFlag) ATTError {
+func (a *attServer) checkSecurity(conn *gattDeviceConn, isRead bool, flags attstructure.CharacteristicFlag) ATTError {
 	if isRead && flags&attstructure.CharacteristicRead == 0 {
 		return ATTErrorReadNotPermitted
 	}
@@ -270,10 +306,10 @@ func (a *attServer) checkSecurity(isRead bool, flags attstructure.Characteristic
 	}
 
 	if needEncryption || needAuthentication {
-		if a.parent.smpConn == nil {
+		if conn.smpConn == nil {
 			return ATTErrorUnlikelyError
 		}
-		encryption, authentication, _ := a.parent.smpConn.GetSecurity()
+		encryption, authentication, _ := conn.smpConn.GetSecurity()
 		if needEncryption && !encryption {
 			return ATTErrorInsufficientEncryption
 		}
@@ -296,7 +332,7 @@ func (a *attServer) handleReadReq(conn *gattDeviceConn, method ATTCommand, buf *
 		return false, sendError(conn, method, idx, ATTErrorInvalidHandle)
 	}
 
-	secErr := a.checkSecurity(true, handle.Info.Flags)
+	secErr := a.checkSecurity(conn, true, handle.Info.Flags)
 	if secErr != ATTErrorNone {
 		return false, sendError(conn, method, idx, secErr)
 	}
@@ -335,7 +371,13 @@ func (a *attServer) handleReadReq(conn *gattDeviceConn, method ATTCommand, buf *
 }
 
 func (a *attServer) handleReadReqMultiple(conn *gattDeviceConn, method ATTCommand, buf *pdu.PDU) (bool, error) {
-	resp := bleutil.GetBuffer(2)
+	/* Per spec, the request body is a sequence of 16-bit handles. An odd
+	   number of bytes is a protocol violation. */
+	if buf.Len() < 4 || buf.Len()%2 != 0 {
+		return false, sendError(conn, method, 0, ATTErrorInvalidPDU)
+	}
+
+	resp := bleutil.GetBuffer(1)
 	resp.Buf()[0] = byte(method + 1)
 
 	addLen := method == ATTReadMultipleValueReq
@@ -347,29 +389,31 @@ func (a *attServer) handleReadReqMultiple(conn *gattDeviceConn, method ATTComman
 		idx := binary.LittleEndian.Uint16(buf.DropLeft(2))
 		handle := a.findHandle(idx)
 		if handle == nil {
+			bleutil.ReleaseBuffer(resp)
 			return false, sendError(conn, method, idx, ATTErrorInvalidHandle)
 		}
 
-		secErr := a.checkSecurity(true, handle.Info.Flags)
+		secErr := a.checkSecurity(conn, true, handle.Info.Flags)
 		if secErr != ATTErrorNone {
+			bleutil.ReleaseBuffer(resp)
 			return false, sendError(conn, method, idx, secErr)
 		}
 
 		if addLen {
-			if buf.Len()+2 > conn.getMTU() {
+			if resp.Len()+2 > conn.getMTU() {
 				break
 			}
 
-			binary.LittleEndian.PutUint16(buf.ExtendRight(2), uint16(len(handle.Value)))
+			binary.LittleEndian.PutUint16(resp.ExtendRight(2), uint16(len(handle.Value)))
 		}
 
-		full, _ := a.addPayload(conn, buf, handle.Value)
+		full, _ := a.addPayload(conn, resp, handle.Value)
 		if full {
 			break
 		}
 	}
 
-	return false, a.write(conn, buf)
+	return false, a.write(conn, resp)
 }
 
 func (a *attServer) handleWriteReq(conn *gattDeviceConn, method ATTCommand, buf *pdu.PDU) (bool, error) {
@@ -383,13 +427,35 @@ func (a *attServer) handleWriteReq(conn *gattDeviceConn, method ATTCommand, buf 
 		return false, sendError(conn, method, idx, ATTErrorInvalidHandle)
 	}
 
-	secErr := a.checkSecurity(false, handle.Info.Flags)
+	secErr := a.checkSecurity(conn, false, handle.Info.Flags)
 	if secErr != ATTErrorNone {
 		return false, sendError(conn, method, idx, secErr)
 	}
+	if method == ATTWriteReq && handle.Info.Flags&attstructure.CharacteristicWriteAck == 0 {
+		return false, sendError(conn, method, idx, ATTErrorWriteNotPermitted)
+	}
+	if method == ATTWriteCMD && handle.Info.Flags&attstructure.CharacteristicWriteNoAck == 0 {
+		return false, nil
+	}
+	if handle.ValueConfig.LengthFixed && buf.Len() != len(handle.Value) {
+		if method == ATTWriteReq {
+			return false, sendError(conn, method, idx, ATTErrorLength)
+		}
+		return false, nil
+	}
+	if handle.ValueConfig.LengthMax > 0 && buf.Len() > int(handle.ValueConfig.LengthMax) {
+		if method == ATTWriteReq {
+			return false, sendError(conn, method, idx, ATTErrorLength)
+		}
+		return false, nil
+	}
 
 	a.localStructure.Lock()
-	handle.Value = append(handle.Value[:0], buf.Buf()...)
+	if handle.ValueConfig.LengthFixed {
+		copy(handle.Value, buf.Buf())
+	} else {
+		handle.Value = append(handle.Value[:0], buf.Buf()...)
+	}
 	if handle.ValueConfig.ValueWriteCb != nil {
 		handle.ValueConfig.ValueWriteCb(handle)
 	}
@@ -415,23 +481,39 @@ func (a *attServer) handlePrepateWriteReq(conn *gattDeviceConn, buf *pdu.PDU) (b
 		return false, sendError(conn, ATTPrepareWriteReq, idx, ATTErrorInvalidHandle)
 	}
 
-	secErr := a.checkSecurity(false, handle.Info.Flags)
+	secErr := a.checkSecurity(conn, false, handle.Info.Flags)
 	if secErr != ATTErrorNone {
 		return false, sendError(conn, ATTPrepareWriteReq, idx, secErr)
 	}
 
 	offset := binary.LittleEndian.Uint16(buf.Buf()[2:])
+	payloadLen := buf.Len() - 4
+
+	/* Per-fragment bounds so a chatty peer cannot exhaust memory before
+	   the commit-time check fires. */
+	if handle.ValueConfig.LengthMax > 0 && int(offset)+payloadLen > int(handle.ValueConfig.LengthMax) {
+		return false, sendError(conn, ATTPrepareWriteReq, idx, ATTErrorLength)
+	}
 
 	a.localStructure.Lock()
-	if len(a.writeQueue) > 64 {
+	if len(conn.writeQueue) >= 64 {
 		a.localStructure.Unlock()
 		return false, sendError(conn, ATTPrepareWriteReq, idx, ATTErrorPrepareQueueFull)
 	}
 
-	payload := make([]byte, buf.Len()-4)
+	queuedBytes := payloadLen
+	for _, q := range conn.writeQueue {
+		queuedBytes += len(q.payload)
+	}
+	if queuedBytes > maxPrepareWriteQueueBytes {
+		a.localStructure.Unlock()
+		return false, sendError(conn, ATTPrepareWriteReq, idx, ATTErrorPrepareQueueFull)
+	}
+
+	payload := make([]byte, payloadLen)
 	copy(payload, buf.Buf()[4:])
 
-	a.writeQueue = append(a.writeQueue, attServerWriteQueueEntry{
+	conn.writeQueue = append(conn.writeQueue, attServerWriteQueueEntry{
 		idx:     idx,
 		handle:  handle,
 		offset:  offset,
@@ -447,19 +529,35 @@ func (a *attServer) handleExecuteWriteReq(conn *gattDeviceConn, buf *pdu.PDU) (b
 	if buf.Len() != 1 {
 		return false, ErrorProtocolViolation
 	}
+	flag := buf.Buf()[0]
+	if flag > 1 {
+		return false, sendError(conn, ATTExecuteWriteReq, 0, ATTErrorInvalidPDU)
+	}
 
 	errCode := ATTError(0)
 	errIdx := uint16(0)
 
+	type savedValue struct {
+		bytes []byte
+		cap   int
+	}
+
 	a.localStructure.Lock()
-	if buf.Buf()[0] == 1 {
-		/* Save all the original values in case we need to roll back */
-		originalMap := make(map[*attstructure.GATTHandle]([]byte))
-		for _, m := range a.writeQueue {
-			originalMap[m.handle] = m.payload
+	if flag == 1 {
+		/* Save the original slice header (length + capacity) so the
+		   rollback can preserve any LengthFixed-style preallocated
+		   buffer. The previous version restored a slice with cap==len
+		   and silently broke fixed-capacity invariants. */
+		originalMap := make(map[*attstructure.GATTHandle]savedValue)
+		for _, m := range conn.writeQueue {
+			if _, ok := originalMap[m.handle]; !ok {
+				snapshot := make([]byte, len(m.handle.Value), cap(m.handle.Value))
+				copy(snapshot, m.handle.Value)
+				originalMap[m.handle] = savedValue{bytes: snapshot, cap: cap(m.handle.Value)}
+			}
 		}
 
-		for _, m := range a.writeQueue {
+		for _, m := range conn.writeQueue {
 			if int(m.offset) > len(m.handle.Value) {
 				errIdx = m.idx
 				errCode = ATTErrorInvalidOffset
@@ -468,6 +566,11 @@ func (a *attServer) handleExecuteWriteReq(conn *gattDeviceConn, buf *pdu.PDU) (b
 
 			minLen := int(m.offset) + len(m.payload)
 			if m.handle.ValueConfig.LengthMax > 0 && minLen > int(m.handle.ValueConfig.LengthMax) {
+				errIdx = m.idx
+				errCode = ATTErrorLength
+				goto fail
+			}
+			if m.handle.ValueConfig.LengthFixed && minLen > len(m.handle.Value) {
 				errIdx = m.idx
 				errCode = ATTErrorLength
 				goto fail
@@ -487,9 +590,11 @@ func (a *attServer) handleExecuteWriteReq(conn *gattDeviceConn, buf *pdu.PDU) (b
 		}
 
 	fail:
-		if errIdx > 0 {
-			for i, m := range originalMap {
-				i.Value = m
+		if errCode != 0 {
+			for h, sv := range originalMap {
+				/* Restore the original slice header — including the
+				   original capacity — so LengthFixed invariants survive. */
+				h.Value = sv.bytes[:len(sv.bytes):sv.cap]
 			}
 		} else {
 			for i := range originalMap {
@@ -501,7 +606,7 @@ func (a *attServer) handleExecuteWriteReq(conn *gattDeviceConn, buf *pdu.PDU) (b
 
 	}
 
-	a.writeQueue = a.writeQueue[:0]
+	conn.writeQueue = conn.writeQueue[:0]
 	a.localStructure.Unlock()
 
 	if errCode != 0 {
@@ -533,6 +638,8 @@ func (a *attServer) handlePDU(conn *gattDeviceConn, method ATTCommand, isAuthent
 		fallthrough
 	case ATTWriteCMD:
 		return a.handleWriteReq(conn, method, buf)
+	case ATTSignedWriteCMD:
+		return false, nil
 
 	/* Transaction write */
 	case ATTPrepareWriteReq:
@@ -619,4 +726,3 @@ func (a *attServer) write(conn *gattDeviceConn, buf *pdu.PDU) error {
 
 	return conn.conn.WriteBuffer(buf)
 }
-

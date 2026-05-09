@@ -69,6 +69,9 @@ func DefaultConfig() *ControllerConfig {
 }
 
 func New(logger *logrus.Entry, dev hciinterface.HCIInterface, config *ControllerConfig) *Controller {
+	if config == nil {
+		config = DefaultConfig()
+	}
 	c := &Controller{
 		logger: logger,
 		dev:    dev,

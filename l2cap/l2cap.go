@@ -38,6 +38,10 @@ type L2CAP struct {
 
 	sig    *signalling
 	config *L2CAPConfig
+
+	closeMu  sync.Mutex
+	closed   bool
+	closeErr error
 }
 
 type L2CAPConfig struct {
@@ -194,6 +198,20 @@ func (l *L2CAP) Run() error {
 }
 
 func (l *L2CAP) Close() error {
+	/* Close re-enters via L2Connection.Close → l.Close on internal
+	   channels (canClose=false). A flag-and-mutex idempotency pattern
+	   handles that safely; sync.Once would deadlock here because the
+	   recursive Do() call from within the closing func would block on
+	   the Once's internal mutex. */
+	l.closeMu.Lock()
+	if l.closed {
+		err := l.closeErr
+		l.closeMu.Unlock()
+		return err
+	}
+	l.closed = true
+	l.closeMu.Unlock()
+
 	var conn []*l2cid
 	l.Lock()
 	for _, m := range l.cidMap {
@@ -202,11 +220,18 @@ func (l *L2CAP) Close() error {
 	l.Unlock()
 
 	for _, m := range conn {
-		m.rxHandler(0, nil)
+		if m.rxHandler != nil {
+			m.rxHandler(0, nil)
+		}
 	}
 
 	l.sig.Close()
-	return l.conn.Close()
+	err := l.conn.Close()
+
+	l.closeMu.Lock()
+	l.closeErr = err
+	l.closeMu.Unlock()
+	return err
 }
 
 func (l *L2CAP) SendCommandUint16(ctx context.Context, code uint8, result []uint16, params ...uint16) (uint8, []uint16, error) {

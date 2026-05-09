@@ -29,7 +29,7 @@ const (
 	solHCI = 0
 
 	eventCommandComplete = 0xE
-	eventCommandStatus   = 0xE
+	eventCommandStatus   = 0xF
 	eventLeMeta          = 0x3E
 
 	cmsgHCIDir       = 0x0001
@@ -303,14 +303,15 @@ func Open(deviceName string) (hciinterface.HCIInterface, error) {
 func (d *HCILinux) Run() error {
 	d.Lock()
 	if d.closed {
-		return ErrorClosed
 		d.Unlock()
+		return ErrorClosed
 	}
 
 	err := unix.Pipe(d.closePipe[:])
 	if err != nil {
 		unix.Close(d.sock)
 		d.closed = true
+		d.Unlock()
 		return err
 	}
 	d.Unlock()
@@ -437,17 +438,29 @@ func (d *HCILinux) Close() error {
 }
 
 // SendPacket sends a HCI packet to the device.
+//
+// The blocking unix.Write must NOT happen with d.Mutex held: Close()
+// also takes the mutex, and a stalled controller would otherwise prevent
+// the host from ever shutting down. Snapshot the fd under the lock and
+// rely on the kernel returning EBADF on a write to a closed fd.
 func (d *HCILinux) SendPacket(pkt hciinterface.HCITxPacket) error {
 	d.Lock()
-	defer d.Unlock()
-
 	if d.closed {
+		d.Unlock()
 		return ErrorClosed
 	}
+	fd := d.sock
+	d.Unlock()
 
 	for {
-		_, err := unix.Write(d.sock, pkt.Data)
+		_, err := unix.Write(fd, pkt.Data)
 		if err == syscall.EINTR {
+			d.Lock()
+			closed := d.closed
+			d.Unlock()
+			if closed {
+				return ErrorClosed
+			}
 			continue
 		}
 		return err

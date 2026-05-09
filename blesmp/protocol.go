@@ -2,7 +2,6 @@ package blesmp
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 
 	bleutil "github.com/BertoldVdb/go-ble/util"
 	pdu "github.com/BertoldVdb/go-misc/pdubuf"
@@ -20,6 +19,13 @@ const (
 	smpWaitPairingConfirm  smpFsmState = 2
 	smpWaitPairingRandom   smpFsmState = 3
 	smpKeyDistribution     smpFsmState = 4
+
+	// LE Secure Connections sub-states
+	smpSCWaitPublicKey      smpFsmState = 10
+	smpSCWaitConfirm        smpFsmState = 11
+	smpSCWaitRandom         smpFsmState = 12
+	smpSCWaitNumericConfirm smpFsmState = 13
+	smpSCWaitDHKeyCheck     smpFsmState = 14
 )
 
 type smpProtocol struct {
@@ -41,11 +47,39 @@ type smpProtocol struct {
 	pairingLTKValid    bool
 	pairingEDIVValid   bool
 	pairingLTK         smpStoredLTK
+
+	/* LE Secure Connections — populated only when both sides agree on
+	   the SC bit during the Pairing Request/Response exchange. All
+	   multi-byte values are stored in big-endian (the spec's natural
+	   byte order); reversal happens at the wire boundary. */
+	scActive       bool
+	scKeyPair      *scKeyPair
+	scPeerPubX     [32]byte
+	scPeerPubY     [32]byte
+	scDHKey        [32]byte
+	scLocalNonce   [16]byte
+	scRemoteNonce  [16]byte
+	scLocalConfirm [16]byte
+	scPeerConfirm  [16]byte
+	scAlgorithm    int    // 0=JustWorks, 1=Passkey, 2=NumericComparison, 3=OOB
+	scPasskey      uint32 // user-entered or randomly displayed
+	scPasskeyBit   int
+	scMacKey       [16]byte
+	scLTK          [16]byte
+	scNumericValue uint32 // result of g2() for the user prompt
+	scPeerSentRand bool   // peripheral has received initiator's random
 }
 
 func (c *SMPConn) sendBuf(pdu *pdu.PDU) error {
 	if c.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-		c.logger.WithField("0pdu", hex.EncodeToString(pdu.Buf())).Debug("SMP Send")
+		opcode := byte(0)
+		if pdu.Len() > 0 {
+			opcode = pdu.Buf()[0]
+		}
+		c.logger.WithFields(logrus.Fields{
+			"0opcode": opcode,
+			"1len":    pdu.Len(),
+		}).Debug("SMP send")
 	}
 
 	return c.conn.WriteBuffer(pdu)
@@ -107,14 +141,20 @@ func (c *SMPConn) sendPairingRequestResponse(initiator bool) {
 	c.protocol.state = smpWaitPairingResponse
 	c.protocol.pairingLTKValid = false
 	c.protocol.pairingEDIVValid = false
+	c.protocol.pairingLTKComplete = false
 	c.protocol.pairingKeySize = 16
 	c.protocol.pairingLTK.Authenticated = false
+
+	authReq := c.secureAuthReq
+	// Always advertise SC capability when the implementation can do it
+	// (the LE SC code path is implemented; AuthReq bit 3 = SC).
+	authReq |= 0x08
 
 	req := [7]byte{
 		byte(opcodePairingRequest),
 		uint8(c.getIOCapability()),
 		0,
-		c.secureAuthReq,
+		authReq,
 		byte(c.protocol.pairingKeySize),
 	}
 
@@ -148,6 +188,29 @@ func (c *SMPConn) signalPairingFailed(reason smpFailedReason) {
 	c.logger.WithFields(logrus.Fields{"0reason": reason, "1state": c.protocol.state}).Warn("Pairing failed")
 	c.protocol.state = smpWaitStart
 	c.updateTimeout(false)
+
+	/* Wipe in-progress LTK material so a stale partial LTK from this
+	   pairing attempt cannot leak into a subsequent attempt or be
+	   mistakenly accepted as bonded. */
+	c.protocol.pairingLTK = smpStoredLTK{}
+	c.protocol.pairingLTKValid = false
+	c.protocol.pairingEDIVValid = false
+	c.protocol.pairingLTKComplete = false
+	c.protocol.pairingTK = [16]byte{}
+	c.protocol.pairingSTK = [16]byte{}
+
+	/* Wipe LE Secure Connections state too. */
+	c.protocol.scActive = false
+	c.protocol.scKeyPair = nil
+	c.protocol.scDHKey = [32]byte{}
+	c.protocol.scLocalNonce = [16]byte{}
+	c.protocol.scRemoteNonce = [16]byte{}
+	c.protocol.scLocalConfirm = [16]byte{}
+	c.protocol.scPeerConfirm = [16]byte{}
+	c.protocol.scMacKey = [16]byte{}
+	c.protocol.scLTK = [16]byte{}
+	c.protocol.scPasskey = 0
+	c.protocol.scPasskeyBit = 0
 
 	c.setState(StateFailed)
 }
@@ -224,7 +287,20 @@ func (c *SMPConn) handleStageConfirm(initiator bool) bool {
 
 	c.protocol.pairingKeySize = kl1
 
-	if c.protocol.pairingKeySize < 7 || c.protocol.pairingKeySize > 16 {
+	/* The spec floor is 7 bytes (56 bits), but accepting it silently is the
+	   KNOB attack surface. Apply our local MinKeySize policy on top. */
+	minKey := c.config.MinKeySize
+	if minKey <= 0 {
+		minKey = 16
+	}
+	if minKey < 7 {
+		minKey = 7
+	}
+	if c.protocol.pairingKeySize < minKey || c.protocol.pairingKeySize > 16 {
+		c.logger.WithFields(logrus.Fields{
+			"0negotiated": c.protocol.pairingKeySize,
+			"1minimum":    minKey,
+		}).Warn("Refusing to accept downgraded LTK key size")
 		c.sendPairingFailed(failedEncryptionKeySize)
 		return false
 	}
@@ -244,6 +320,12 @@ func (c *SMPConn) handlePairingRequest(req []byte) {
 	copy(c.protocol.pairingRequest[:], req)
 	c.sendPairingRequestResponse(false)
 
+	if c.scNegotiated() {
+		c.protocol.scActive = true
+		c.scStartFromResponder()
+		return
+	}
+
 	if !c.handleStageConfirm(false) {
 		return
 	}
@@ -251,6 +333,12 @@ func (c *SMPConn) handlePairingRequest(req []byte) {
 
 func (c *SMPConn) handlePairingResponse(resp []byte) {
 	copy(c.protocol.pairingResponse[:], resp)
+
+	if c.scNegotiated() {
+		c.protocol.scActive = true
+		c.scStartFromInitiator()
+		return
+	}
 
 	if !c.handleStageConfirm(true) {
 		return
@@ -262,6 +350,12 @@ func (c *SMPConn) handlePairingResponse(resp []byte) {
 	c.sendBuf(buf)
 
 	c.protocol.state = smpWaitPairingConfirm
+}
+
+// scNegotiated reports whether both sides set the SC bit in AuthReq —
+// the precondition for the LE Secure Connections flow.
+func (c *SMPConn) scNegotiated() bool {
+	return c.protocol.pairingRequest[3]&0x08 != 0 && c.protocol.pairingResponse[3]&0x08 != 0
 }
 
 func (c *SMPConn) handlePairingConfirm(resp []byte) {
@@ -295,9 +389,7 @@ func (c *SMPConn) handlePairingRandom(rand []byte) {
 	c.protocol.pairingSTK = CryptoFuncS1(c.isCentral, c.protocol.pairingTK, c.protocol.pairingIRand, pairingRRand)
 	c.protocol.pairingSTK = CryptoShortenKey(c.protocol.pairingSTK, c.protocol.pairingKeySize)
 
-	c.logger.WithFields(logrus.Fields{
-		"0stk": hex.EncodeToString(c.protocol.pairingSTK[:]),
-	}).Info("STK Calculated")
+	c.logger.Info("STK calculated")
 
 	c.updateTimeout(false)
 
@@ -358,23 +450,37 @@ func (c *SMPConn) handlePairingRandom(rand []byte) {
 }
 
 func (c *SMPConn) updateLTK() {
+	/* In production c.parent is always set. Tests construct an SMPConn
+	   in isolation; for those we just update the in-memory key flags
+	   and skip the shared key store. */
+	if c.parent == nil {
+		c.leSetKeyFlagsFromLTK(c.protocol.pairingLTK)
+		return
+	}
+
 	c.parent.storedKeysPersist.Lock()
 	if !c.isCentral {
 		c.parent.storedKeys[makeSMPStoredLTKMapKey(c.isCentral, c.addrLELocal, c.addrLERemote, 0, 0)] = c.protocol.pairingLTK
 	}
 	c.parent.storedKeys[makeSMPStoredLTKMapKey(c.isCentral, c.addrLELocal, c.addrLERemote, c.protocol.pairingLTK.EDIV, c.protocol.pairingLTK.Rand)] = c.protocol.pairingLTK
 	c.parent.storedKeysPersist.Unlock()
-	err := c.parent.storedKeysPersist.Save()
+
+	/* Persist to disk only for bonded keys. Non-bonded LTKs are kept
+	   in-memory so the LELongTermKeyRequest handler can find them for
+	   the duration of the session, but should not survive a restart. */
+	var err error
+	if c.protocol.pairingLTK.Bonded {
+		err = c.parent.storedKeysPersist.Save()
+	}
 
 	c.leSetKeyFlagsFromLTK(c.protocol.pairingLTK)
 
 	c.logger.WithError(err).WithFields(logrus.Fields{
 		"0ediv":   c.protocol.pairingLTK.EDIV,
 		"1rand":   c.protocol.pairingLTK.Rand,
-		"2ltk":    hex.EncodeToString(c.protocol.pairingLTK.LTK[:]),
-		"3bonded": c.protocol.pairingLTK.Bonded,
-		"4auth":   c.protocol.pairingLTK.Authenticated,
-	}).Info("LTK Saved")
+		"2bonded": c.protocol.pairingLTK.Bonded,
+		"3auth":   c.protocol.pairingLTK.Authenticated,
+	}).Info("LTK saved")
 }
 
 func (c *SMPConn) handleKeyDistribution(opcode smpOpcode, data []byte) bool {
@@ -408,6 +514,25 @@ func (c *SMPConn) handleKeyDistribution(opcode smpOpcode, data []byte) bool {
 		handleLTK()
 		return true
 	}
+	/* Other valid key-distribution PDUs (IRK, IdentityAddress, CSRK) are not
+	   yet processed by this implementation. Silently accept them — the spec
+	   permits the peer to send any keys it advertised in the pairing
+	   request/response, and failing the connection here would prevent
+	   pairing with stacks that always send IRK/CSRK. */
+	switch opcode {
+	case opcodeKDIdentityInformation:
+		if len(data) == 16 {
+			return true
+		}
+	case opcodeKDIdentityAddressInformation:
+		if len(data) == 7 {
+			return true
+		}
+	case opcodeKDSigningInformation:
+		if len(data) == 16 {
+			return true
+		}
+	}
 	return false
 }
 
@@ -425,6 +550,16 @@ func (c *SMPConn) handleMessage(pdu *pdu.PDU) bool {
 		}
 
 		c.signalPairingFailed(reason)
+		return false
+	}
+
+	// Route SC-flow PDUs to the SC state machine when SC was negotiated.
+	if c.protocol.scActive {
+		if c.scHandleMessage(opcode, pdu.Buf()[1:]) {
+			return false
+		}
+		// Unrecognised opcode for current SC state.
+		c.sendPairingFailed(failedCommandNotSupported)
 		return false
 	}
 

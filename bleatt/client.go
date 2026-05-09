@@ -16,8 +16,9 @@ import (
 )
 
 type attClientCmdData struct {
-	method ATTCommand
-	buf    *pdu.PDU
+	method   ATTCommand
+	buf      *pdu.PDU
+	expected ATTCommand // expected response opcode (request opcode + 1)
 }
 
 type attClient struct {
@@ -65,6 +66,16 @@ func (a *attClient) sendCommand(ctx context.Context, cmd *pdu.PDU, withReply boo
 	if !withReply {
 		return 0, nil, a.write(cmd, false)
 	}
+
+	/* Stamp the expected response opcode (req+1) so handlePDU can
+	   discard a stale response that arrives after a previous request
+	   timed out — without this check, writeHandle/findInformation/...
+	   silently treat any non-error response as success. */
+	expected := ATTCommand(0)
+	if cmd.Len() > 0 {
+		expected = ATTCommand(cmd.Buf()[0]) + 1
+	}
+	slot.Data.(*attClientCmdData).expected = expected
 
 	slot.Activate()
 
@@ -138,7 +149,10 @@ func (a *attClient) handleNTFIND(method ATTCommand, buf *pdu.PDU) (bool, error) 
 			dlen := binary.LittleEndian.Uint16(hdr[2:])
 
 			data := buf.DropLeft(int(dlen))
-			if hdr == nil {
+			if data == nil {
+				/* Peer declared a length larger than the buffer; the cursor
+				   was not advanced, so there is no way to recover the parser.
+				   Stop processing this PDU. */
 				break
 			}
 
@@ -184,7 +198,7 @@ func (a *attClient) handleNTFIND(method ATTCommand, buf *pdu.PDU) (bool, error) 
 
 func (a *attClient) close() {
 	a.timeoutTimerMutex.Lock()
-	a.timeoutTimer.Reset(0)
+	a.timeoutTimer.Stop()
 	a.timeoutTimerMutex.Unlock()
 
 	a.cmdmgr.Close()
@@ -207,6 +221,19 @@ func (a *attClient) handlePDU(method ATTCommand, isAuthenticated bool, buf *pdu.
 		keepBuffer := false
 		err := a.cmdmgr.IterateActive(func(slot *slotset.Slot) (bool, error) {
 			data := slot.Data.(*attClientCmdData)
+			/* Drop stale responses that don't correspond to the active
+			   request. ATTErrorRsp is always allowed (peer can refuse
+			   any request); otherwise the response opcode must be the
+			   expected one. */
+			if data.expected != 0 && method != ATTErrorRsp && method != data.expected {
+				if a.parent.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+					a.parent.logger.WithFields(logrus.Fields{
+						"0got":      method,
+						"1expected": data.expected,
+					}).Debug("Dropping ATT response with unexpected opcode")
+				}
+				return false, nil
+			}
 			data.method = method
 			data.buf = buf
 
