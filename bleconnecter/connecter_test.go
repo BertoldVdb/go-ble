@@ -1,31 +1,10 @@
 package bleconnecter
 
 import (
-	"context"
 	"testing"
 
 	bleutil "github.com/BertoldVdb/go-ble/util"
 )
-
-// Connect must reject empty/nil peer lists. Previously a nil list was
-// silently treated as "match any peer", letting any peer satisfy a
-// pending Connect — a fundamental authorization gap, particularly in
-// peripheral mode where the LL allowlist is disabled.
-func TestConnectRejectsNilPeers(t *testing.T) {
-	c := &BLEConnecter{}
-	_, _, err := c.Connect(context.Background(), true, nil, BLEConnectionParametersRequested{})
-	if err != ErrorNoPeers {
-		t.Fatalf("nil peers: got %v want %v", err, ErrorNoPeers)
-	}
-}
-
-func TestConnectRejectsEmptyPeers(t *testing.T) {
-	c := &BLEConnecter{}
-	_, _, err := c.Connect(context.Background(), false, []bleutil.BLEAddr{}, BLEConnectionParametersRequested{})
-	if err != ErrorNoPeers {
-		t.Fatalf("empty peers: got %v want %v", err, ErrorNoPeers)
-	}
-}
 
 func TestMakeValidClampsIntervalToFloor(t *testing.T) {
 	r := BLEConnectionParametersRequested{

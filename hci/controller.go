@@ -172,8 +172,58 @@ func (c *Controller) configureDevice() error {
 	/* Packet based flow control */
 	c.Cmds.BasebandWriteFlowControlModeSync(hcicommands.BasebandWriteFlowControlModeInput{})
 
+	/* Raise the LL data-length suggested default so all subsequent
+	   connections automatically negotiate up to ~10x throughput on
+	   bulk transfers. Gated on the LE Data Packet Length Extension
+	   feature (Core spec §4.6, bit 5 of LE Features) — controllers
+	   without DLE reject the command. Failure is non-fatal: a
+	   misbehaving controller just keeps the legacy 27-byte LL packets. */
+	c.applyDefaultDataLength()
+
 	/* Setup the privacy address */
 	return c.setLERandomAddress()
+}
+
+// applyDefaultDataLength asks the controller to use the maximum LL
+// data-length its hardware supports as the suggested default for new
+// connections. The peer must also support DLE for the link to actually
+// negotiate up — otherwise this is a no-op on the wire.
+func (c *Controller) applyDefaultDataLength() {
+	if c.Info.LESupportedFeatures == nil {
+		return
+	}
+	const featureDataLengthExtension = 1 << 5
+	if c.Info.LESupportedFeatures.LEFeatures&featureDataLengthExtension == 0 {
+		c.logger.Debug("Controller does not advertise LE Data Length Extension; leaving LL data length at default")
+		return
+	}
+
+	/* Spec ceilings for the suggested default: 251 octets, 2120 µs at
+	   1M PHY. Many controllers report exactly these as the supported
+	   max; some report less, which we honor. */
+	octets := uint16(251)
+	txTime := uint16(2120)
+	if max, err := c.Cmds.LEReadMaximumDataLengthSync(nil); err == nil && max != nil {
+		if max.SupportedMaxTXOctets > 0 && max.SupportedMaxTXOctets < octets {
+			octets = max.SupportedMaxTXOctets
+		}
+		if max.SupportedMaxTXTime > 0 && max.SupportedMaxTXTime < txTime {
+			txTime = max.SupportedMaxTXTime
+		}
+	}
+
+	err := c.Cmds.LEWriteSuggestedDefaultDataLengthSync(hcicommands.LEWriteSuggestedDefaultDataLengthInput{
+		SuggestedMaxTXOctets: octets,
+		SuggestedMaxTXTime:   txTime,
+	})
+	if err != nil {
+		c.logger.WithError(err).Debug("LE Write Suggested Default Data Length failed; sticking with controller default")
+		return
+	}
+	c.logger.WithFields(logrus.Fields{
+		"0octets": octets,
+		"1txTime": txTime,
+	}).Info("Raised LL data length suggested default")
 }
 
 func (c *Controller) Run(ready func()) error {

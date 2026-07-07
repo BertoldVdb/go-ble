@@ -63,8 +63,52 @@ type GattDeviceConfig struct {
 	DiscoverRemoteOnConnect bool
 	MTU                     uint16
 
-	DiscoveryCacheGet func(dev *GattDevice) []*attstructure.GATTHandle
-	DiscoveryCacheSet func(dev *GattDevice, handles []*attstructure.GATTHandle)
+	DiscoveryCacheGet func(dev *GattDevice) *CachedGATT
+	DiscoveryCacheSet func(dev *GattDevice, cached *CachedGATT)
+}
+
+// CachedGATT is the unit of persistence for the GATT discovery cache.
+// Callers wire it through DiscoveryCacheGet / DiscoveryCacheSet, keyed
+// by whatever peer identity they prefer (typically the bonded identity
+// address). On a cache hit the library validates entries that publish
+// Service Changed (0x2A05) with a single Read by Type request before
+// trusting them; entries with ServiceChangedHandle == 0 are trusted
+// as-is, since the caller has implicitly asserted the peer's database
+// is static.
+//
+// DiscoveryCacheSet is also called with cached == nil to signal that
+// the previously stored entry should be evicted (e.g. validation
+// detected the database changed under us).
+type CachedGATT struct {
+	// Handles is the full attribute list returned by discovery, in
+	// handle order. Required.
+	Handles []*attstructure.GATTHandle
+
+	// GATTServiceStart / GATTServiceEnd is the inclusive handle range
+	// of the GATT Service (0x1801) on this peer. Used to scope the
+	// Read by Type validation request. Both zero means the peer did
+	// not publish a GATT Service in the cached discovery (rare —
+	// strictly speaking the GATT Service is mandatory).
+	GATTServiceStart uint16
+	GATTServiceEnd   uint16
+
+	// ServiceChangedHandle is the value handle of the Service Changed
+	// characteristic (UUID 0x2A05) within the GATT Service, or 0 if
+	// the peer does not publish it. When non-zero, the library will
+	// re-verify the handle on every cache hit; a mismatch evicts the
+	// cache and triggers a full rediscovery. When zero, the cache is
+	// trusted without verification.
+	ServiceChangedHandle uint16
+
+	// BondedCCCDPersistent, when true, makes Subscribe skip the CCCD
+	// write on this peer (the bonded server already has the bit set
+	// from a previous session, so the write is a wasted round trip).
+	// Set this only for peers verified to persist CCCD state across
+	// connections — getting it wrong means subscriptions silently
+	// break with no spec-defined way to detect it. Unsubscribe always
+	// writes through, so the bonded subscription can still be torn
+	// down explicitly.
+	BondedCCCDPersistent bool
 }
 
 func DefaultConfig() *GattDeviceConfig {
@@ -422,6 +466,33 @@ func (d *GattDevice) ServerGetNotifyMTU(characteristic *attstructure.Characteris
 	}
 
 	return conn.getMTUBlocking()
+}
+
+// ClientGetMTU returns the negotiated ATT MTU on the connection used by
+// ClientRead/ClientWrite (the initial connection). Blocks until the MTU
+// exchange has completed, then returns the agreed value (minimum 23 by
+// spec). Returns 23 if there is no connection yet.
+func (d *GattDevice) ClientGetMTU(ctx context.Context) int {
+	select {
+	case <-ctx.Done():
+		return 23
+	case <-d.initialConnValid:
+	}
+	return d.initialConn.getMTUBlocking()
+}
+
+// ClientGetMaxWriteLength returns the maximum payload size for a single
+// ClientWrite (or Characteristic.SetValue) call — the negotiated ATT
+// MTU minus the 3-byte ATT Write header. Larger writes are truncated
+// to this length by the underlying writeHandle. For values that need
+// to exceed this, use long-write semantics (not currently implemented
+// in this client).
+func (d *GattDevice) ClientGetMaxWriteLength(ctx context.Context) int {
+	mtu := d.ClientGetMTU(ctx)
+	if mtu < 3 {
+		return 0
+	}
+	return mtu - 3
 }
 
 func (d *GattDevice) HasConnections() bool {

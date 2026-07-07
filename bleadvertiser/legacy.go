@@ -230,6 +230,20 @@ func (s *LegacyAdvertisingSlot) ReplaceData(force bool, new LegacyAdvertisingDat
 	return new, nil
 }
 
+// LegacyAdvertisingGetBaseSlot returns the slot that BLEConnecter
+// modifies in LegacyAdvertisingSetConnection. Use it when you need the
+// connectable advertisement to carry caller-supplied BeaconPacket /
+// ScanPacket bytes rather than the defaults derived from
+// BLEAdvertiserConfig — SetConnection only flips Active/Type/PeerAddr
+// and preserves the rest, so writing to this slot before calling
+// BLEConnecter.Connect lets the cloned beacon bytes survive the
+// connectability toggle. Triggers init the first time it's called so
+// the returned slot is the one SetConnection will actually use.
+func (a *BLEAdvertiser) LegacyAdvertisingGetBaseSlot() *LegacyAdvertisingSlot {
+	a.legacyAdvertisingInit()
+	return a.legacyAdvertisingBaseSlot
+}
+
 func (a *BLEAdvertiser) LegacyAdvertisingGetSlot() *LegacyAdvertisingSlot {
 	a.legacyAdvertisingMutex.Lock()
 	defer a.legacyAdvertisingMutex.Unlock()

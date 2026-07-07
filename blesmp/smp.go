@@ -15,7 +15,6 @@ import (
 	hcievents "github.com/BertoldVdb/go-ble/hci/events"
 	blel2cap "github.com/BertoldVdb/go-ble/l2cap"
 	bleutil "github.com/BertoldVdb/go-ble/util"
-	"github.com/BertoldVdb/go-misc/gobpersist"
 	pdu "github.com/BertoldVdb/go-misc/pdubuf"
 	"github.com/BertoldVdb/go-misc/waitstate"
 	"github.com/sirupsen/logrus"
@@ -81,11 +80,48 @@ type SMPConnConfig struct {
 	// when zero. Set explicitly to 7 only when interoperating with very
 	// old peers that cannot negotiate higher.
 	MinKeySize int
+
+	// RefusePairingWithCachedLTK rejects any pairing attempt — whether
+	// initiated locally (central sending Pairing Request) or by the
+	// remote (peripheral receiving Pairing Request) — when an LTK is
+	// already stored for this peer. This blocks attacks that force a
+	// fresh pairing exchange to extract passkey/PIN material from a
+	// peer we already authenticated. Recovery from a genuine bond
+	// loss requires the caller to evict the stored LTK explicitly
+	// before reconnecting. Default (false) preserves the historical
+	// permissive behaviour. Detection covers SC bonded keys and
+	// central-side legacy keys — peripheral-side legacy keys are
+	// stored without remote-address indexing and cannot be looked
+	// up here.
+	RefusePairingWithCachedLTK bool
 }
 
 type SMPConfig struct {
-	StoredKeysPath    string
+	// StoredKeysPath selects the on-disk file used by the default
+	// FileKeyStore. Ignored when KeyStore is set.
+	StoredKeysPath string
+	// KeyStore, when non-nil, supplies the backing store SMP uses to
+	// persist its long-term key database. This lets callers replace the
+	// default file-backed store with e.g. an encrypted blob, a database
+	// row, or a remote secret manager. When nil, SMP falls back to a
+	// FileKeyStore using StoredKeysPath.
+	KeyStore          KeyStore
 	DefaultConnConfig *SMPConnConfig
+
+	// OnRebond is invoked from the goroutine processing SMP traffic
+	// whenever a fresh pairing completes and the previous LTK for the
+	// peer was overwritten — i.e. we successfully re-paired with a
+	// peer we had already bonded with. The argument is the remote LE
+	// address used during pairing. Use this signal to evict any
+	// per-peer state that depends on the previous bond, in particular
+	// the GATT discovery cache: if the peer forgot us at the link
+	// layer it may also have forgotten our subscriptions and shifted
+	// its attribute layout, so the cached structure is no longer
+	// trustworthy. The callback runs synchronously on the SMP
+	// handler goroutine; keep it short or hand work off to a
+	// goroutine. Detection covers SC bonded keys and central-side
+	// legacy keys; peripheral-side legacy rebonds are not detected.
+	OnRebond func(remote bleutil.BLEAddr)
 }
 
 func DefaultConfig() *SMPConfig {
@@ -113,7 +149,22 @@ type SMP struct {
 	controller *hci.Controller
 
 	storedKeys        map[smpStoredLTKMapKey]smpStoredLTK
-	storedKeysPersist *gobpersist.GobPersist
+	storedKeysPersist *smpKeyPersist
+}
+
+// hasStoredLTKForPeer reports whether the key store already holds a
+// long-term key for the (isCentral, local, remote) tuple. The lookup
+// uses the SC slot key (EDIV=0, Rand=0), which is also where central
+// stores its single-per-peer entry — so this catches every SC bonded
+// pair plus all central-side legacy bonds. Peripheral-side legacy keys
+// are stored under EDIV/Rand without the remote address, so they are
+// not detected here; that is acceptable for the rebond/refuse-pairing
+// signals, which are about modern (SC) usage.
+func (s *SMP) hasStoredLTKForPeer(isCentral bool, local, remote bleutil.BLEAddr) bool {
+	s.storedKeysPersist.Lock()
+	defer s.storedKeysPersist.Unlock()
+	_, ok := s.storedKeys[makeSMPStoredLTKMapKey(isCentral, local, remote, 0, 0)]
+	return ok
 }
 
 // smpConnFromConn returns the SMPConn attached to a connmgr.Connection,
@@ -176,14 +227,18 @@ func New(logger *logrus.Entry, controller *hci.Controller, config *SMPConfig) *S
 		EncryptionRefresh:  s.connmgrEncryptionRefresh,
 	})
 
-	s.storedKeysPersist = &gobpersist.GobPersist{
-		Target:   &s.storedKeys,
-		Filename: config.StoredKeysPath,
+	store := config.KeyStore
+	if store == nil {
+		if config.StoredKeysPath != "" {
+			logger.WithError(os.MkdirAll(filepath.Dir(config.StoredKeysPath), 0o700)).Debug("Creating LTK database directory")
+		}
+		store = &FileKeyStore{Path: config.StoredKeysPath}
+	}
+	s.storedKeysPersist = &smpKeyPersist{
+		target: &s.storedKeys,
+		store:  store,
 	}
 
-	if config.StoredKeysPath != "" {
-		logger.WithError(os.MkdirAll(filepath.Dir(config.StoredKeysPath), 0o700)).Debug("Creating LTK database directory")
-	}
 	logger.WithError(s.storedKeysPersist.Load()).Info("Loading LTK database")
 	logger.WithError(s.storedKeysPersist.Save()).Debug("Saving LTK database")
 

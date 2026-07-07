@@ -181,7 +181,23 @@ func (c *SMPConn) sendPairingRequestResponse(initiator bool) {
 }
 
 func (c *SMPConn) sendPairingRequest() {
+	if c.refusePairingWithCachedLTK() {
+		c.logger.Warn("Refusing to initiate pairing — cached LTK exists for peer")
+		c.signalPairingFailed(failedPairingNotSupported)
+		return
+	}
 	c.sendPairingRequestResponse(true)
+}
+
+// refusePairingWithCachedLTK returns true when the per-connection
+// configuration asks SMP to reject pairing whenever an LTK is already
+// stored for the peer. Used as a guard at every pairing-init point on
+// both central and peripheral sides.
+func (c *SMPConn) refusePairingWithCachedLTK() bool {
+	if c.parent == nil || !c.config.RefusePairingWithCachedLTK {
+		return false
+	}
+	return c.parent.hasStoredLTKForPeer(c.isCentral, c.addrLELocal, c.addrLERemote)
 }
 
 func (c *SMPConn) signalPairingFailed(reason smpFailedReason) {
@@ -317,6 +333,12 @@ func (c *SMPConn) handleStageConfirm(initiator bool) bool {
 }
 
 func (c *SMPConn) handlePairingRequest(req []byte) {
+	if c.refusePairingWithCachedLTK() {
+		c.logger.Warn("Refusing inbound pairing — cached LTK exists for peer")
+		c.sendPairingFailed(failedPairingNotSupported)
+		return
+	}
+
 	copy(c.protocol.pairingRequest[:], req)
 	c.sendPairingRequestResponse(false)
 
@@ -458,7 +480,17 @@ func (c *SMPConn) updateLTK() {
 		return
 	}
 
+	/* Detect rebonding: if the SC-slot key (EDIV=0, Rand=0) is already
+	   present for this (isCentral, local, remote) tuple, the new LTK we
+	   are about to write is replacing an existing bond. The OnRebond
+	   callback fires after the store is updated and the lock is
+	   released, so the user's eviction handler can safely call back
+	   into SMP without deadlocking. Only fired for bonded pairings —
+	   transient non-bonded LTKs do not represent a bond. */
+	rebondKey := makeSMPStoredLTKMapKey(c.isCentral, c.addrLELocal, c.addrLERemote, 0, 0)
+
 	c.parent.storedKeysPersist.Lock()
+	_, isRebond := c.parent.storedKeys[rebondKey]
 	if !c.isCentral {
 		c.parent.storedKeys[makeSMPStoredLTKMapKey(c.isCentral, c.addrLELocal, c.addrLERemote, 0, 0)] = c.protocol.pairingLTK
 	}
@@ -481,6 +513,10 @@ func (c *SMPConn) updateLTK() {
 		"2bonded": c.protocol.pairingLTK.Bonded,
 		"3auth":   c.protocol.pairingLTK.Authenticated,
 	}).Info("LTK saved")
+
+	if isRebond && c.protocol.pairingLTK.Bonded && c.parent.config.OnRebond != nil {
+		c.parent.config.OnRebond(c.addrLERemote)
+	}
 }
 
 func (c *SMPConn) handleKeyDistribution(opcode smpOpcode, data []byte) bool {

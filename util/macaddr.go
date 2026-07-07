@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 )
 
@@ -42,6 +43,14 @@ func (m MacAddr) String() string {
 
 func (m MacAddr) Network() string {
 	return "Bluetooth"
+}
+
+// HardwareAddr returns the MAC address as a net.HardwareAddr in
+// canonical MSB-first byte order (matching String()).
+func (m MacAddr) HardwareAddr() net.HardwareAddr {
+	var wire [6]byte
+	m.Encode(wire[:])
+	return net.HardwareAddr{wire[5], wire[4], wire[3], wire[2], wire[1], wire[0]}
 }
 
 func MacAddrFromString(mac string) (MacAddr, error) {

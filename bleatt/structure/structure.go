@@ -21,6 +21,16 @@ type Structure struct {
 	clientNotifyMutex sync.Mutex
 	clientNotifyMap   map[uint16](ClientNotifyHandler)
 
+	// SkipCCCDWrite, when true, causes Subscribe(handler) to install the
+	// local notify-handler entry without writing the CCCD. Set this only
+	// for peers that have been verified to persist CCCD state in their
+	// bond context — the bonded server already has the subscription bit
+	// set from a previous session, and the write is wasted bytes plus
+	// one round trip. Unsubscribe (handler == nil) always writes,
+	// regardless of this flag, so the user can still tear the
+	// subscription down explicitly.
+	SkipCCCDWrite bool
+
 	services []*Service
 	exported *ExportedStructure
 }
@@ -67,10 +77,16 @@ func (s *Structure) AddPrimaryService(uuid bleutil.UUID) *Service {
 }
 
 func (s *Structure) GetServices() []*Service {
+	if s == nil {
+		return nil
+	}
 	return s.services
 }
 
 func (s *Structure) GetService(uuid bleutil.UUID) *Service {
+	if s == nil {
+		return nil
+	}
 	for _, m := range s.services {
 		if m.uuid == uuid {
 			return m
@@ -100,10 +116,16 @@ func (p *Service) AddCharacteristicReadOnly(uuid bleutil.UUID, value []byte) *Ch
 }
 
 func (p *Service) GetCharacteristics() []*Characteristic {
+	if p == nil {
+		return nil
+	}
 	return p.characteristics
 }
 
 func (p *Service) GetCharacteristic(uuid bleutil.UUID) *Characteristic {
+	if p == nil {
+		return nil
+	}
 	for _, m := range p.characteristics {
 		if m.uuid == uuid {
 			return m
@@ -193,10 +215,17 @@ func (c *Characteristic) Subscribe(ctx context.Context, handler ClientNotifyHand
 	   after the peer accepts the subscription. Otherwise a failed CCCD
 	   write would leave a dangling handler that would fire on any
 	   peer-sent notification (and an unsubscribe failure would leave a
-	   stale handler bound). */
-	_, err := c.parent.parent.clientWrite(ctx, c.ValueHandle.CCCHandle.Info.Handle, new, true)
-	if err != nil {
-		return err
+	   stale handler bound).
+
+	   SkipCCCDWrite skips the subscribe-side write only — bonded peers
+	   that persist CCCD state already have the bit set from a previous
+	   session. Unsubscribe (handler == nil) always writes through, so
+	   the bonded subscription can still be torn down. */
+	if handler == nil || !c.parent.parent.SkipCCCDWrite {
+		_, err := c.parent.parent.clientWrite(ctx, c.ValueHandle.CCCHandle.Info.Handle, new, true)
+		if err != nil {
+			return err
+		}
 	}
 
 	c.parent.parent.clientNotifyMutex.Lock()

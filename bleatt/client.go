@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	attstructure "github.com/BertoldVdb/go-ble/bleatt/structure"
@@ -32,7 +33,30 @@ type attClient struct {
 
 	timeoutTimerMutex sync.Mutex
 	timeoutTimer      *time.Timer
+
+	// preDiscoveryIND captures the handles of any indications received
+	// before discoverRemoteDeviceStructure has settled. The cache
+	// validation path consults this set so that a Service Changed
+	// indication that fires immediately on encrypted reconnect — before
+	// our Read by Type validation completes — still triggers eviction.
+	// preDiscoveryINDOpen flips to false once discovery completes; from
+	// that point inbound indications dispatch through the structure
+	// normally and the map is no longer touched. Bounded at a small
+	// size to keep a chatty peer from growing it without bound.
+	preDiscoveryINDMutex sync.Mutex
+	preDiscoveryIND      map[uint16]struct{}
+	preDiscoveryINDOpen  bool
+
+	// notifyDebugSeq is a per-connection monotonic counter for the
+	// "Got notification" debug log. Incremented only when Debug is
+	// enabled, so non-debug builds pay nothing. Lets the operator
+	// distinguish "peer spammed N distinct PDUs in a tight loop" from
+	// "library re-delivered the same buffer" when paired with the
+	// logged PDU pointer.
+	notifyDebugSeq uint64
 }
+
+const preDiscoveryINDMaxEntries = 32
 
 func (a *attClient) init(parent *gattDeviceConn) error {
 	*a = attClient{
@@ -45,6 +69,9 @@ func (a *attClient) init(parent *gattDeviceConn) error {
 		timeoutTimer: time.AfterFunc(time.Hour, func() {
 			parent.parent.CloseConn(parent.conn)
 		}),
+
+		preDiscoveryIND:     make(map[uint16]struct{}),
+		preDiscoveryINDOpen: true,
 	}
 
 	a.timeoutTimer.Stop()
@@ -175,11 +202,18 @@ func (a *attClient) handleNTFIND(method ATTCommand, buf *pdu.PDU) (bool, error) 
 		isIndication := method == ATTHandleValueIND
 
 		if a.parent.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+			seq := atomic.AddUint64(&a.notifyDebugSeq, 1)
 			a.parent.logger.WithFields(logrus.Fields{
 				"0handle":       handle,
 				"1isIndication": isIndication,
 				"2data":         buf,
+				"3pdu":          fmt.Sprintf("%p", buf),
+				"4seq":          seq,
 			}).Debug("Got notification")
+		}
+
+		if isIndication {
+			a.recordPreDiscoveryIndication(handle)
 		}
 
 		a.handleNotify(handle, buf.Buf())
@@ -487,17 +521,178 @@ func attErrorToError(atterr ATTError) error {
 	return fmt.Errorf("ATT Error: %d", atterr)
 }
 
+// recordPreDiscoveryIndication is called from handleNTFIND for every
+// inbound indication. It captures the handle into a small set as long
+// as discovery is still in progress; once discovery completes the set
+// is no longer touched and stops growing. The cache validation path
+// reads this set after Read by Type SC settles, so a Service Changed
+// indication that fires before validation completes still triggers
+// eviction.
+func (a *attClient) recordPreDiscoveryIndication(handle uint16) {
+	a.preDiscoveryINDMutex.Lock()
+	defer a.preDiscoveryINDMutex.Unlock()
+	if !a.preDiscoveryINDOpen {
+		return
+	}
+	if len(a.preDiscoveryIND) >= preDiscoveryINDMaxEntries {
+		return
+	}
+	a.preDiscoveryIND[handle] = struct{}{}
+}
+
+func (a *attClient) closePreDiscoveryWindow() {
+	a.preDiscoveryINDMutex.Lock()
+	a.preDiscoveryINDOpen = false
+	a.preDiscoveryIND = nil
+	a.preDiscoveryINDMutex.Unlock()
+}
+
+func (a *attClient) sawPreDiscoveryIndication(handle uint16) bool {
+	if handle == 0 {
+		return false
+	}
+	a.preDiscoveryINDMutex.Lock()
+	defer a.preDiscoveryINDMutex.Unlock()
+	_, ok := a.preDiscoveryIND[handle]
+	return ok
+}
+
+// findGATTServiceRange walks the handle list (in handle order) and
+// returns the inclusive handle range of the GATT Service (UUID 0x1801),
+// or (0, 0) if the peer does not publish one. It identifies the service
+// by matching UUIDPrimaryService entries and reading the service-UUID
+// payload, then scanning forward to the next service declaration.
+func findGATTServiceRange(handles []*attstructure.GATTHandle) (uint16, uint16) {
+	const gattServiceUUID16 = 0x1801
+
+	startIdx := -1
+	for i, h := range handles {
+		if h.Info.UUID != attstructure.UUIDPrimaryService {
+			continue
+		}
+		if len(h.Value) != 2 {
+			continue
+		}
+		uuid16 := binary.LittleEndian.Uint16(h.Value)
+		if uuid16 == gattServiceUUID16 {
+			startIdx = i
+			break
+		}
+	}
+	if startIdx < 0 {
+		return 0, 0
+	}
+
+	start := handles[startIdx].Info.Handle
+	end := uint16(0xFFFF)
+	for i := startIdx + 1; i < len(handles); i++ {
+		u := handles[i].Info.UUID
+		if u == attstructure.UUIDPrimaryService || u == attstructure.UUIDSecondaryService {
+			end = handles[i].Info.Handle - 1
+			break
+		}
+	}
+	return start, end
+}
+
+// findServiceChangedHandle scans the cached attribute list for the
+// Service Changed value handle (UUID 0x2A05) within the GATT Service
+// range. Returns 0 if not present.
+func findServiceChangedHandle(handles []*attstructure.GATTHandle, start, end uint16) uint16 {
+	scUUID := bleutil.UUIDFromStringPanic("2a05")
+	if start == 0 && end == 0 {
+		return 0
+	}
+	for _, h := range handles {
+		if h.Info.Handle < start || h.Info.Handle > end {
+			continue
+		}
+		if h.Info.UUID == scUUID {
+			return h.Info.Handle
+		}
+	}
+	return 0
+}
+
+// validateServiceChanged issues a Read by Type request for UUID 0x2A05
+// over the cached GATT Service range and returns true when the response
+// reports the same handle the cache recorded. A mismatch (or any error
+// short of a clean ATTErrorAttributeNotFound, which is a definitive
+// "the peer's GATT Service no longer hosts Service Changed") signals
+// the cache must be evicted. ATTErrorAttributeNotFound is treated the
+// same way: if the cache said SC was at handle X and the peer no
+// longer has it, the database has changed.
+func (a *attClient) validateServiceChanged(ctx context.Context, c *CachedGATT) bool {
+	scUUID := bleutil.UUIDFromStringPanic("2a05")
+	ub := scUUID.UUIDToBytes()
+
+	buf := bleutil.GetBuffer(5 + len(ub))
+	buf.Buf()[0] = byte(ATTReadByTypeReq)
+	binary.LittleEndian.PutUint16(buf.Buf()[1:], c.GATTServiceStart)
+	binary.LittleEndian.PutUint16(buf.Buf()[3:], c.GATTServiceEnd)
+	copy(buf.Buf()[4:], ub)
+
+	cmd, response, aterr, err := a.sendCommandErrRsp(ctx, buf)
+	defer bleutil.ReleaseBuffer(response)
+	if err != nil {
+		return false
+	}
+	if aterr != 0 || cmd != ATTReadByTypeRsp {
+		return false
+	}
+
+	header := response.DropLeft(3)
+	if header == nil {
+		return false
+	}
+	gotHandle := binary.LittleEndian.Uint16(header[1:])
+	return gotHandle == c.ServiceChangedHandle
+}
+
 func (a *attClient) discoverRemoteDeviceStructure() (*attstructure.Structure, error) {
 	/* With a high MTU this goes so much faster */
 	a.parent.getMTUBlocking()
 
-	var gattHandles []*attstructure.GATTHandle
-	if a.parent.parent.config.DiscoveryCacheGet != nil {
-		gattHandles = a.parent.parent.config.DiscoveryCacheGet(a.parent.parent)
+	defer a.closePreDiscoveryWindow()
+
+	cfg := a.parent.parent.config
+
+	var (
+		gattHandles []*attstructure.GATTHandle
+		cached      *CachedGATT
+		fromCache   bool
+	)
+
+	if cfg.DiscoveryCacheGet != nil {
+		cached = cfg.DiscoveryCacheGet(a.parent.parent)
 	}
 
-	cacheStr := ""
-	if gattHandles == nil {
+	if cached != nil && len(cached.Handles) > 0 {
+		ctx := context.Background()
+
+		valid := true
+		if cached.ServiceChangedHandle != 0 {
+			if !a.validateServiceChanged(ctx, cached) {
+				a.parent.logger.Debug("GATT cache invalid: Service Changed handle moved or missing")
+				valid = false
+			} else if a.sawPreDiscoveryIndication(cached.ServiceChangedHandle) {
+				a.parent.logger.Debug("GATT cache invalid: Service Changed indication observed during validation")
+				valid = false
+			}
+		}
+
+		if valid {
+			gattHandles = cached.Handles
+			fromCache = true
+		} else {
+			if cfg.DiscoveryCacheSet != nil {
+				cfg.DiscoveryCacheSet(a.parent.parent, nil)
+			}
+			cached = nil
+		}
+	}
+
+	if !fromCache {
 		ctx := context.Background()
 
 		handles, err := a.findInformationAll(ctx, 1, 0xFFFF)
@@ -521,10 +716,12 @@ func (a *attClient) discoverRemoteDeviceStructure() (*attstructure.Structure, er
 
 			gattHandles = append(gattHandles, handle)
 		}
-	} else {
-		cacheStr = " (cached)"
 	}
 
+	cacheStr := ""
+	if fromCache {
+		cacheStr = " (cached)"
+	}
 	for _, m := range gattHandles {
 		a.parent.logger.WithFields(logrus.Fields{
 			"1uuid":   m.Info.UUID,
@@ -538,8 +735,30 @@ func (a *attClient) discoverRemoteDeviceStructure() (*attstructure.Structure, er
 		return result, err
 	}
 
-	if a.parent.parent.config.DiscoveryCacheSet != nil {
-		a.parent.parent.config.DiscoveryCacheSet(a.parent.parent, gattHandles)
+	/* SkipCCCDWrite is a per-peer assertion the caller persists in the
+	   cache. On a fresh discovery (no cache, or post-eviction) the flag
+	   defaults to false — a freshly bonded peer needs the first CCCD
+	   write to actually arrive on the wire. The caller's
+	   DiscoveryCacheSet implementation decides what value to store
+	   going forward; if they set BondedCCCDPersistent=true, subsequent
+	   reconnects will hit the cache hot path and skip the write. */
+	if fromCache && cached != nil && cached.BondedCCCDPersistent {
+		result.SkipCCCDWrite = true
+	}
+
+	if cfg.DiscoveryCacheSet != nil {
+		next := &CachedGATT{
+			Handles: gattHandles,
+		}
+		next.GATTServiceStart, next.GATTServiceEnd = findGATTServiceRange(gattHandles)
+		next.ServiceChangedHandle = findServiceChangedHandle(gattHandles, next.GATTServiceStart, next.GATTServiceEnd)
+		if cached != nil {
+			/* Carry over caller-set policy across rediscovery — losing
+			   BondedCCCDPersistent because the database changed shape
+			   would needlessly demote a peer the user already trusts. */
+			next.BondedCCCDPersistent = cached.BondedCCCDPersistent
+		}
+		cfg.DiscoveryCacheSet(a.parent.parent, next)
 	}
 
 	return result, nil

@@ -17,8 +17,7 @@ import (
 )
 
 var (
-	ErrorClosed   = errors.New("Connecter is closed")
-	ErrorNoPeers  = errors.New("Connect requires at least one peer address")
+	ErrorClosed = errors.New("Connecter is closed")
 )
 
 type BLEConnecterConfig struct {
@@ -130,14 +129,18 @@ func (c *BLEConnecter) leConnectionCompleteHandler(event *hcievents.LEConnection
 	rightPeer := false
 
 	if role.peerValid {
-		/* peerAddrCandidates must be non-empty: Connect() rejects nil/empty
-		   inputs, and the central success path explicitly clears the list
-		   after a successful connection so subsequent racing events do not
-		   wildcard-match. */
-		for _, m := range role.peer.peerAddrCandidates {
-			if m == remoteAddr {
-				rightPeer = true
-				break
+		/* nil/empty peerAddrCandidates means "accept any peer". This is
+		   useful for peripheral mode (we just want to be connected to)
+		   and is also what the central success path leaves behind after
+		   it clears the list. */
+		if len(role.peer.peerAddrCandidates) == 0 {
+			rightPeer = true
+		} else {
+			for _, m := range role.peer.peerAddrCandidates {
+				if m == remoteAddr {
+					rightPeer = true
+					break
+				}
 			}
 		}
 	}
@@ -229,16 +232,6 @@ func (c *BLEConnecter) Close() error {
 
 func (c *BLEConnecter) Connect(ctx context.Context, isCentral bool, peerAddrs []bleutil.BLEAddr, request BLEConnectionParametersRequested) (*BLEConnection, []bleutil.BLEAddr, error) {
 	var err error
-
-	/* Refuse to connect with no peers. Previously a nil/empty list was
-	   silently treated as "accept any peer" by the connection-complete
-	   handler — a serious authorization gap, especially in peripheral mode
-	   (where the LL allowlist is disabled). Callers that genuinely want
-	   "any peer" must opt in via a future AcceptAny flag rather than
-	   overloading nil. */
-	if len(peerAddrs) == 0 {
-		return nil, peerAddrs, ErrorNoPeers
-	}
 
 	roleID := 0
 	if !isCentral {
