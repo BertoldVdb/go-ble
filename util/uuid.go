@@ -126,7 +126,8 @@ func (base UUID) CreateVariant(key uint8) UUID {
 }
 
 func (base UUID) CreateVariantAlt(key uint8) UUID {
-	if base.GetLength() != 16 {
+	// also allow 2 byte UUIDS as a quirk
+	if base.GetLength() != 16 && base.GetLength() != 2 {
 		panic("Variant creation is only possible for random UUID")
 	}
 
